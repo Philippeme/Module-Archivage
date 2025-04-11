@@ -1,0 +1,25 @@
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  .app-header {
+    flex-shrink: 0;
+  }
+  
+  .app-main {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .navbar-nav {
+    margin-left: 280px; /* Aligner avec le bord du contenu principal (largeur de la sidebar) */
+  }
+  
+  /* Pour s'assurer que cet alignement est uniquement appliqué aux éléments de menu (pas au contenu à droite) */
+  .navbar-collapse {
+    display: flex;
+    justify-content: space-between;
+  }

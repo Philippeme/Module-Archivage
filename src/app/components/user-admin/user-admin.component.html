@@ -1,0 +1,209 @@
+<div class="user-admin-container">
+    <div class="user-admin-header">
+        <div class="d-flex align-items-center">
+            <button class="btn btn-outline-secondary me-3" (click)="navigateBack()">
+                <i class="bi bi-arrow-left"></i> Retour
+            </button>
+            <h2>Gestion des Utilisateurs</h2>
+        </div>
+        <button class="btn btn-primary" (click)="onAddUser()">
+            <i class="bi bi-person-plus"></i> Ajouter un utilisateur
+        </button>
+    </div>
+
+    <!-- Messages de succès ou d'erreur -->
+    <div class="alert alert-success mb-3" *ngIf="successMessage">{{ successMessage }}</div>
+    <div class="alert alert-danger mb-3" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+    <!-- Tableau des utilisateurs -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Nom d'utilisateur</th>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Niveau</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let user of users">
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.firstName }} {{ user.lastName }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>{{ user.level }}</td>
+                    <td>
+                        <span class="badge" [ngClass]="user.active ? 'bg-success' : 'bg-danger'">
+                            {{ user.active ? 'Actif' : 'Inactif' }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" (click)="onEditUser(user)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" (click)="onDeleteUser(user)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <tr *ngIf="users.length === 0 && !isLoading">
+                    <td colspan="7" class="text-center">Aucun utilisateur trouvé</td>
+                </tr>
+                <tr *ngIf="isLoading">
+                    <td colspan="7" class="text-center">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Chargement...</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Utilisateur -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalLabel">{{ modalTitle }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <form [formGroup]="userForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="username" class="form-label">Nom d'utilisateur*</label>
+                                <input type="text" class="form-control" id="username" formControlName="username">
+                                <div class="invalid-feedback"
+                                    *ngIf="userForm.get('username')?.invalid && userForm.get('username')?.touched">
+                                    <span *ngIf="userForm.get('username')?.errors?.['required']">Le nom d'utilisateur
+                                        est requis</span>
+                                    <span *ngIf="userForm.get('username')?.errors?.['minlength']">Le nom d'utilisateur
+                                        doit contenir au moins 3 caractères</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">
+                                    Mot de passe{{ modalAction === 'update' ? ' (laisser vide pour ne pas modifier)' :
+                                    '*' }}
+                                </label>
+                                <input type="password" class="form-control" id="password" formControlName="password">
+                                <div class="invalid-feedback"
+                                    *ngIf="userForm.get('password')?.invalid && userForm.get('password')?.touched">
+                                    <span *ngIf="userForm.get('password')?.errors?.['required']">Le mot de passe est
+                                        requis</span>
+                                    <span *ngIf="userForm.get('password')?.errors?.['minlength']">Le mot de passe doit
+                                        contenir au moins 6 caractères</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="firstName" class="form-label">Prénom*</label>
+                                <input type="text" class="form-control" id="firstName" formControlName="firstName">
+                                <div class="invalid-feedback"
+                                    *ngIf="userForm.get('firstName')?.invalid && userForm.get('firstName')?.touched">
+                                    Le prénom est requis
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="lastName" class="form-label">Nom*</label>
+                                <input type="text" class="form-control" id="lastName" formControlName="lastName">
+                                <div class="invalid-feedback"
+                                    *ngIf="userForm.get('lastName')?.invalid && userForm.get('lastName')?.touched">
+                                    Le nom est requis
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email*</label>
+                            <input type="email" class="form-control" id="email" formControlName="email">
+                            <div class="invalid-feedback"
+                                *ngIf="userForm.get('email')?.invalid && userForm.get('email')?.touched">
+                                <span *ngIf="userForm.get('email')?.errors?.['required']">L'email est requis</span>
+                                <span *ngIf="userForm.get('email')?.errors?.['email']">Veuillez entrer une adresse email
+                                    valide</span>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="role" class="form-label">Rôle*</label>
+                                <select class="form-select" id="role" formControlName="role">
+                                    <option *ngFor="let role of userRoles" [value]="role">{{ role }}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="level" class="form-label">Niveau*</label>
+                                <select class="form-select" id="level" formControlName="level"
+                                    (change)="onLevelChange()">
+                                    <option *ngFor="let level of userLevels" [value]="level">{{ level }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Champs conditionnels selon le niveau -->
+                        <div class="mb-3" *ngIf="userForm.get('level')?.value === 'REGIONAL'">
+                            <label for="regions" class="form-label">Régions</label>
+                            <select multiple class="form-select" id="regions" formControlName="regions">
+                                <option *ngFor="let region of availableRegions" [value]="region">{{ region }}</option>
+                            </select>
+                            <small class="form-text text-muted">Maintenez la touche Ctrl ou Cmd pour sélectionner
+                                plusieurs options</small>
+                        </div>
+
+                        <div class="mb-3" *ngIf="userForm.get('level')?.value === 'CENTER'">
+                            <label for="centers" class="form-label">Centres d'état civil</label>
+                            <select multiple class="form-select" id="centers" formControlName="centers">
+                                <option *ngFor="let center of availableCenters" [value]="center">{{ center }}</option>
+                            </select>
+                            <small class="form-text text-muted">Maintenez la touche Ctrl ou Cmd pour sélectionner
+                                plusieurs options</small>
+                        </div>
+
+                        <div class="mb-3" *ngIf="userForm.get('level')?.value === 'COURT'">
+                            <label for="tribunals" class="form-label">Tribunaux</label>
+                            <select multiple class="form-select" id="tribunals" formControlName="tribunals">
+                                <option *ngFor="let tribunal of availableTribunals" [value]="tribunal">{{ tribunal }}
+                                </option>
+                            </select>
+                            <small class="form-text text-muted">Maintenez la touche Ctrl ou Cmd pour sélectionner
+                                plusieurs options</small>
+                        </div>
+
+                        <div class="mb-3" *ngIf="userForm.get('level')?.value === 'DECLARATION_CENTER'">
+                            <label for="declarationCenters" class="form-label">Centres de déclaration</label>
+                            <select multiple class="form-select" id="declarationCenters"
+                                formControlName="declarationCenters">
+                                <option *ngFor="let center of availableDeclarationCenters" [value]="center">{{ center }}
+                                </option>
+                            </select>
+                            <small class="form-text text-muted">Maintenez la touche Ctrl ou Cmd pour sélectionner
+                                plusieurs options</small>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="active" formControlName="active">
+                            <label class="form-check-label" for="active">Utilisateur actif</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" (click)="saveUser()" [disabled]="isLoading">
+                        <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+                        Enregistrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

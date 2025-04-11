@@ -1,0 +1,51 @@
+/* You can add global styles to this file, and also import other style files */
+/* Styles globaux */
+@import '~bootstrap-icons/font/bootstrap-icons.css';
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+/* Classes d'utilitaires supplémentaires */
+.text-purple {
+  color: #6f42c1 !important;
+}
+
+.text-teal {
+  color: #20c997 !important;
+}
+
+/* Améliorer l'apparence des breadcrumbs */
+.breadcrumb-item + .breadcrumb-item::before {
+  color: #adb5bd;
+}
+
+.breadcrumb-item.active {
+  color: #495057;
+  font-weight: 500;
+}
+
+/* Améliorations pour les tableaux et grilles */
+.table {
+  font-size: 0.9rem;
+}
+
+/* Styles pour le mode sombre (optionnel) */
+.dark-mode {
+  background-color: #343a40;
+  color: #f8f9fa;
+}
+
+.dark-mode .bg-light {
+  background-color: #495057 !important;
+}
+
+.dark-mode .text-dark {
+  color: #f8f9fa !important;
+}
+
+.dark-mode .border {
+  border-color: #6c757d !important;
+}

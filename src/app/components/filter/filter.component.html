@@ -1,0 +1,51 @@
+<div class="filter-container">
+    <div class="input-group">
+      <input type="text" class="form-control" placeholder="Rechercher..." [(ngModel)]="searchTerm" (keyup.enter)="applyFilters()">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-funnel"></i>
+      </button>
+      <div class="dropdown-menu p-3 filter-dropdown" aria-labelledby="filterDropdown">
+        <h6 class="dropdown-header">Filtres</h6>
+        
+        <!-- Type de document -->
+        <div class="mb-3">
+          <label for="documentType" class="form-label">Type de document</label>
+          <select class="form-select" id="documentType" [(ngModel)]="filters.documentType">
+            <option value="">Tous</option>
+            <option value="Acte de mariage">Acte de mariage</option>
+            <option value="Déclaration de naissance">Déclaration de naissance</option>
+            <option value="Jugement supplétif">Jugement supplétif</option>
+          </select>
+        </div>
+        
+        <!-- Région -->
+        <div class="mb-3">
+          <label for="region" class="form-label">Région</label>
+          <select class="form-select" id="region" [(ngModel)]="filters.region">
+            <option value="">Toutes</option>
+            <option value="Kayes">Kayes</option>
+            <option value="Koulikoro">Koulikoro</option>
+            <option value="Sikasso">Sikasso</option>
+            <option value="Ségou">Ségou</option>
+            <option value="Mopti">Mopti</option>
+            <option value="District de Bamako">District de Bamako</option>
+          </select>
+        </div>
+        
+        <!-- Date de création -->
+        <div class="mb-3">
+          <label class="form-label">Date de création</label>
+          <div class="input-group">
+            <input type="date" class="form-control" [(ngModel)]="filters.startDate">
+            <span class="input-group-text">à</span>
+            <input type="date" class="form-control" [(ngModel)]="filters.endDate">
+          </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+          <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">Réinitialiser</button>
+          <button class="btn btn-sm btn-primary" (click)="applyFilters()">Appliquer</button>
+        </div>
+      </div>
+    </div>
+  </div>

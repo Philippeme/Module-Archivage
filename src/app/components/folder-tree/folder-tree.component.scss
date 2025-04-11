@@ -1,0 +1,75 @@
+.folder-tree {
+    height: 100%;
+    overflow-y: auto;
+    padding: 10px 0;
+    position: relative;
+}
+
+.tree-root {
+    list-style-type: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.tree-children {
+    list-style-type: none;
+    padding-left: 20px;
+    margin-bottom: 0;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 4px;
+
+    &:hover {
+        background-color: #f0f0f0;
+    }
+
+    &.active {
+        background-color: #e9ecef;
+        font-weight: 500;
+
+        .tree-label {
+            color: #0d6efd;
+        }
+    }
+}
+
+.tree-toggle {
+    display: flex;
+    align-items: center;
+    width: 25px;
+    cursor: pointer;
+}
+
+.tree-label {
+    margin-left: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ajouter cette règle pour créer un décalage supplémentaire pour les sous-menus */
+.tree-children .tree-label {
+    margin-left: 14px;
+    /* Marge légèrement plus grande pour les sous-niveaux */
+}
+
+.folder-root {
+    font-weight: bold;
+}
+
+.spinner-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.7);
+}

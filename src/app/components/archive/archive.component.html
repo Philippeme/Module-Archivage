@@ -1,0 +1,100 @@
+<div class="archive-container">
+    <!-- Menu latéral -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3>Archives</h3>
+        </div>
+        <app-folder-tree [navigationMode]="navigationMode" [currentPath]="currentPath"
+            (folderSelected)="openFolder($event)">
+        </app-folder-tree>
+    </div>
+
+    <!-- Zone principale -->
+    <div class="main-content">
+        <!-- Barre d'outils -->
+        <div class="toolbar">
+            <div class="navigation-controls">
+                <button class="btn btn-sm btn-outline-secondary" [disabled]="!canNavigateBack()"
+                    (click)="navigateBack()">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary ms-1" [disabled]="!canNavigateForward()"
+                    (click)="navigateForward()">
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+
+            <div class="view-controls ms-3">
+                <button class="btn btn-sm" [class.active]="viewMode === 'list'" (click)="setViewMode('list')">
+                    <i class="bi bi-list"></i> Liste
+                </button>
+                <button class="btn btn-sm" [class.active]="viewMode === 'grid'" (click)="setViewMode('grid')">
+                    <i class="bi bi-grid"></i> Icônes
+                </button>
+            </div>
+
+            <div class="organization-controls ms-3" *ngIf="currentPath !== '/Archives'">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm" [class.active]="navigationMode === 'time'"
+                        (click)="setNavigationMode('time')">
+                        <i class="bi bi-calendar3"></i> Par temps
+                    </button>
+                    <button class="btn btn-sm" [class.active]="navigationMode === 'location'"
+                        (click)="setNavigationMode('location')">
+                        <i class="bi bi-geo-alt"></i> Par lieu
+                    </button>
+                </div>
+            </div>
+
+            <app-filter class="ms-auto" (filtersChanged)="applyFilters($event)"></app-filter>
+        </div>
+
+        <!-- Chemin de navigation (breadcrumb) -->
+        <div class="breadcrumb-container">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li *ngFor="let segment of breadcrumbSegments; let isLast = last" class="breadcrumb-item"
+                        [class.active]="isLast">
+                        <a *ngIf="!isLast" href="#" (click)="navigateToBreadcrumb(segment, $event)">{{ segment.name
+                            }}</a>
+                        <span *ngIf="isLast">{{ segment.name }}</span>
+                    </li>
+                </ol>
+            </nav>
+        </div>
+
+        <!-- Alerte d'erreur -->
+        <div class="alert alert-danger m-3" *ngIf="errorMessage">
+            {{ errorMessage }}
+        </div>
+
+        <!-- Indicateur de chargement -->
+        <div class="loading-container" *ngIf="isLoading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+
+        <!-- Contenu (dossiers et documents) -->
+        <div class="content-container" *ngIf="!isLoading">
+            <app-document-list *ngIf="viewMode === 'list'" [folders]="currentFolders" [documents]="currentDocuments"
+                (folderSelected)="openFolder($event)" (folderContextMenu)="openInNewTab($event)"
+                (documentSelected)="openDocument($event)">
+            </app-document-list>
+
+            <app-document-grid *ngIf="viewMode === 'grid'" [folders]="currentFolders" [documents]="currentDocuments"
+                (folderSelected)="openFolder($event)" (folderContextMenu)="openInNewTab($event)"
+                (documentSelected)="openDocument($event)">
+            </app-document-grid>
+
+            <div class="empty-state" *ngIf="currentFolders.length === 0 && currentDocuments.length === 0">
+                <i class="bi bi-folder-x display-1 text-muted"></i>
+                <p class="mt-3">Aucun élément à afficher dans ce dossier</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prévisualisation du document (modal) -->
+    <app-document-preview *ngIf="selectedDocument" [document]="selectedDocument" (close)="closePreview()">
+    </app-document-preview>
+</div>

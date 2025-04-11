@@ -1,0 +1,16 @@
+.document-list {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  .folder-row:hover, .document-row:hover {
+    cursor: pointer;
+  }
+  
+  .actions {
+    white-space: nowrap;
+  }
+  
+  .table th, .table td {
+    vertical-align: middle;
+  }
