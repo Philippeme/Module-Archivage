@@ -1,0 +1,38 @@
+<div class="history-container">
+    <h6 class="history-title">Historique des actions</h6>
+    
+    <!-- Listing des actions -->
+    <div class="history-list">
+      <div *ngIf="isLoading && actions.length === 0" class="text-center py-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Chargement...</span>
+        </div>
+      </div>
+      
+      <div *ngIf="errorMessage" class="alert alert-danger">
+        {{ errorMessage }}
+      </div>
+      
+      <div *ngIf="!isLoading && actions.length === 0" class="text-center text-muted py-3">
+        Aucune action enregistrée pour ce document.
+      </div>
+      
+      <div class="timeline">
+        <div *ngFor="let action of actions" class="timeline-item">
+          <div class="timeline-icon" [ngClass]="getActionColor(action.actionType)">
+            <i class="bi" [ngClass]="getActionIcon(action.actionType)"></i>
+          </div>
+          <div class="timeline-content">
+            <div class="action-header">
+              <div class="action-type">{{ action.actionType }}</div>
+              <div class="action-date">{{ action.actionDate | date:'dd/MM/yyyy HH:mm' }}</div>
+            </div>
+            <div class="action-user">par {{ action.userName }}</div>
+            <div *ngIf="action.details" class="action-details">
+              {{ action.details }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -8,11 +8,21 @@
                 </ng-container>
             </h5>
             <div class="document-preview-actions">
-                <button class="btn btn-sm btn-outline-primary" (click)="downloadCurrentDocument()">
+                <button class="btn btn-sm" [ngClass]="isPreviewMode ? 'btn-outline-info' : 'btn-info'"
+                    (click)="toggleViewMode()">
+                    <i class="bi" [ngClass]="isPreviewMode ? 'bi-file-earmark-text' : 'bi-file-earmark'"></i>
+                    {{ isPreviewMode ? 'Voir document complet' : 'Vue légère' }}
+                </button>
+                <button class="btn btn-sm btn-outline-primary ms-2" (click)="downloadCurrentDocument()">
                     <i class="bi bi-download"></i> Télécharger
                 </button>
                 <button class="btn btn-sm btn-outline-success ms-2" (click)="shareCurrentDocument()">
                     <i class="bi bi-share"></i> Partager
+                </button>
+                <button class="btn btn-sm ms-2" [ngClass]="isFavorite() ? 'btn-warning' : 'btn-outline-warning'"
+                    (click)="toggleFavorite()">
+                    <i class="bi" [ngClass]="isFavorite() ? 'bi-star-fill' : 'bi-star'"></i>
+                    {{ isFavorite() ? 'Favori' : 'Ajouter aux favoris' }}
                 </button>
                 <button class="btn btn-sm btn-outline-secondary ms-2" (click)="closePreview()">
                     <i class="bi bi-x-lg"></i>
@@ -22,46 +32,88 @@
 
         <div class="document-preview-content">
             <div class="document-sidebar">
-                <div class="document-metadata">
-                    <h6>Informations</h6>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Type</dt>
-                        <dd class="col-sm-7">{{ selectedVersion?.type }}</dd>
+                <!-- Onglets pour la navigation -->
+                <ul class="nav nav-tabs nav-fill">
+                    <li class="nav-item">
+                        <a class="nav-link" [class.active]="activeTab === 'info'" (click)="setActiveTab('info')">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Informations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" [class.active]="activeTab === 'comments'"
+                            (click)="setActiveTab('comments')">
+                            <i class="bi bi-chat-left-text me-1"></i>
+                            Commentaires
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" [class.active]="activeTab === 'history'" (click)="setActiveTab('history')">
+                            <i class="bi bi-clock-history me-1"></i>
+                            Historique
+                        </a>
+                    </li>
+                </ul>
 
-                        <dt class="col-sm-5">Date de création</dt>
-                        <dd class="col-sm-7">{{ selectedVersion?.creationDate | date:'dd/MM/yyyy' }}</dd>
+                <!-- Onglet Informations -->
+                <div *ngIf="activeTab === 'info'" class="tab-content">
+                    <div class="document-metadata">
+                        <h6>Informations</h6>
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Type</dt>
+                            <dd class="col-sm-7">{{ selectedVersion?.type }}</dd>
 
-                        <dt class="col-sm-5">Dernière modification</dt>
-                        <dd class="col-sm-7">{{ selectedVersion?.lastModificationDate | date:'dd/MM/yyyy' }}</dd>
+                            <dt class="col-sm-5">Date de création</dt>
+                            <dd class="col-sm-7">{{ selectedVersion?.creationDate | date:'dd/MM/yyyy' }}</dd>
 
-                        <dt class="col-sm-5">Source</dt>
-                        <dd class="col-sm-7">{{ selectedVersion?.sourceInstitution }}</dd>
+                            <dt class="col-sm-5">Dernière modification</dt>
+                            <dd class="col-sm-7">{{ selectedVersion?.lastModificationDate | date:'dd/MM/yyyy' }}</dd>
 
-                        <dt class="col-sm-5">Concerné</dt>
-                        <dd class="col-sm-7">
-                            {{ selectedVersion?.concernedPerson1 }}
-                            <ng-container *ngIf="selectedVersion?.concernedPerson2">
-                                <br>{{ selectedVersion?.concernedPerson2 }}
-                            </ng-container>
-                        </dd>
+                            <dt class="col-sm-5">Source</dt>
+                            <dd class="col-sm-7">{{ selectedVersion?.sourceInstitution }}</dd>
 
-                        <dt class="col-sm-5">Taille</dt>
-                        <dd class="col-sm-7">{{ selectedVersion?.size | number }} Ko</dd>
-                    </dl>
+                            <dt class="col-sm-5">Concerné</dt>
+                            <dd class="col-sm-7">
+                                {{ selectedVersion?.concernedPerson1 }}
+                                <ng-container *ngIf="selectedVersion?.concernedPerson2">
+                                    <br>{{ selectedVersion?.concernedPerson2 }}
+                                </ng-container>
+                            </dd>
+
+                            <dt class="col-sm-5">Taille</dt>
+                            <dd class="col-sm-7">{{ selectedVersion?.size | number }} Ko</dd>
+                        </dl>
+                    </div>
+
+                    <div class="document-versions" *ngIf="documentVersions.length > 1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Versions</h6>
+                            <button class="btn btn-sm btn-outline-primary" (click)="openVersionComparison()"
+                                title="Comparer des versions">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                        </div>
+                        <ul class="list-group">
+                            <li *ngFor="let version of documentVersions"
+                                class="list-group-item d-flex justify-content-between align-items-center"
+                                [class.active]="version.id === selectedVersion?.id" (click)="selectVersion(version)">
+                                Version {{ version.version }}
+                                <span class="badge bg-primary rounded-pill">
+                                    {{ version.lastModificationDate | date:'dd/MM/yyyy' }}
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
 
-                <div class="document-versions" *ngIf="documentVersions.length > 1">
-                    <h6>Versions</h6>
-                    <ul class="list-group">
-                        <li *ngFor="let version of documentVersions"
-                            class="list-group-item d-flex justify-content-between align-items-center"
-                            [class.active]="version.id === selectedVersion?.id" (click)="selectVersion(version)">
-                            Version {{ version.version }}
-                            <span class="badge bg-primary rounded-pill">
-                                {{ version.lastModificationDate | date:'dd/MM/yyyy' }}
-                            </span>
-                        </li>
-                    </ul>
+                <!-- Onglet Commentaires -->
+                <div *ngIf="activeTab === 'comments'" class="tab-content">
+                    <app-document-comments [document]="document"></app-document-comments>
+                </div>
+
+                <!-- Onglet Historique -->
+                <div *ngIf="activeTab === 'history'" class="tab-content">
+                    <app-document-history [document]="document"></app-document-history>
                 </div>
             </div>
 
@@ -82,6 +134,23 @@
                     height="100%">
                 </iframe>
             </div>
+        </div>
+    </div>
+
+    <!-- Composant de comparaison de versions -->
+    <app-version-comparison *ngIf="showComparisonView" [document]="document" [documentVersions]="documentVersions"
+        (close)="closeVersionComparison()">
+    </app-version-comparison>
+
+    <app-email-share-modal *ngIf="showShareModal" [document]="selectedVersion" (close)="closeShareModal()"
+        (success)="handleShareSuccess($event)">
+    </app-email-share-modal>
+
+    <!-- Ajout d'un message de succès pour le partage -->
+    <div *ngIf="shareSuccess" class="share-success-notification">
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            {{ shareSuccess }}
         </div>
     </div>
 </div>

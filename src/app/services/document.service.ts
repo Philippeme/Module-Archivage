@@ -1,19 +1,22 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { delay } from 'rxjs/operators';
-import { catchError, map, tap } from 'rxjs/operators';
+import { catchError, delay, map, tap, switchMap } from 'rxjs/operators';
 import { Document, DocumentType, DocumentComment, DocumentAction, ActionType, Folder } from '../models/document.model';
-import { User, UserRole, UserLevel } from '../models/user.model'; 
+import { User, UserRole, UserLevel } from '../models/user.model';
 import { AuthService } from './auth.service';
 import { environment } from '../../environments/environment';
+import { DocumentSimulatorService } from './document-simulator.service';
+import { FilterCriteria } from '../models/filter.model';
+import { PermissionService } from '../services/permission.service';
+import { PermissionType } from '../models/permission.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DocumentService {
   private apiUrl = 'http://api.example.com/api';
-  
+
   // Pour la démonstration, nous utilisons des données statiques
   private mockDocuments: Document[] = [
     {
@@ -69,22 +72,34 @@ export class DocumentService {
 
   constructor(
     private http: HttpClient,
-    private authService: AuthService
+    private authService: AuthService,
+    private permissionService: PermissionService,
+    private documentSimulator: DocumentSimulatorService
   ) { }
 
   // Méthodes d'accès aux API
-  
-  getDocuments(filters?: any): Observable<Document[]> {
+
+  getDocuments(filterCriteria?: FilterCriteria): Observable<Document[]> {
     if (this.authService.isApiMode()) {
       let params = new HttpParams();
       
-      if (filters) {
-        if (filters.searchTerm) params = params.set('search', filters.searchTerm);
-        if (filters.documentType) params = params.set('type', filters.documentType);
-        if (filters.region) params = params.set('region', filters.region);
-        if (filters.startDate) params = params.set('startDate', filters.startDate);
-        if (filters.endDate) params = params.set('endDate', filters.endDate);
-        if (filters.path) params = params.set('path', filters.path);
+      if (filterCriteria) {
+        // Convertir les critères de filtre en paramètres HTTP
+        Object.entries(filterCriteria).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            if (Array.isArray(value)) {
+              // Pour les tableaux, on peut soit utiliser des paramètres répétés, soit les joindre
+              value.forEach((item: string) => {
+                params = params.append(`${key}[]`, item);
+              });
+            } else if (value instanceof Date) {
+              // Convertir les dates en format ISO
+              params = params.set(key, value.toISOString());
+            } else {
+              params = params.set(key, String(value));
+            }
+          }
+        });
       }
       
       return this.http.get<Document[]>(`${this.apiUrl}/documents`, { params }).pipe(
@@ -94,38 +109,201 @@ export class DocumentService {
         })
       );
     } else {
-      // Mode mock pour développement
+      // Mode mock amélioré pour le filtrage avancé
       let filteredDocs = [...this.mockDocuments];
       
-      if (filters) {
-        if (filters.searchTerm) {
-          const searchTerm = filters.searchTerm.toLowerCase();
-          filteredDocs = filteredDocs.filter(doc => 
-            doc.originalName.toLowerCase().includes(searchTerm) || 
-            doc.concernedPerson1.toLowerCase().includes(searchTerm) ||
-            (doc.concernedPerson2 && doc.concernedPerson2.toLowerCase().includes(searchTerm))
-          );
+      if (filterCriteria) {
+        // Appliquer le filtre sur chaque document en fonction de l'opérateur logique
+        const operator = filterCriteria.logicalOperator || 'AND';
+        
+        if (operator === 'AND') {
+          // Opérateur AND : tous les critères doivent être satisfaits
+          Object.entries(filterCriteria).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '' && key !== 'logicalOperator') {
+              filteredDocs = this.applyFilterCriterion(filteredDocs, key, value);
+            }
+          });
+        } else {
+          // Opérateur OR : au moins un critère doit être satisfait
+          const originalDocs = [...filteredDocs];
+          const matchingDocs = new Set<string>();
+          
+          Object.entries(filterCriteria).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '' && key !== 'logicalOperator') {
+              const docsMatchingCriterion = this.applyFilterCriterion(originalDocs, key, value);
+              docsMatchingCriterion.forEach(doc => matchingDocs.add(doc.id));
+            }
+          });
+          
+          // Ne garder que les documents qui correspondent à au moins un critère
+          if (matchingDocs.size > 0) {
+            filteredDocs = originalDocs.filter(doc => matchingDocs.has(doc.id));
+          }
         }
         
-        if (filters.documentType) {
-          filteredDocs = filteredDocs.filter(doc => doc.type === filters.documentType);
+        // Filtrer les documents supprimés si demandé
+        if (filterCriteria.excludeDeleted) {
+          filteredDocs = filteredDocs.filter(doc => !doc.deleted);
         }
         
-        if (filters.region) {
-          // Simulation de filtrage par région (dans une vraie implémentation, vérifier le path)
-          filteredDocs = filteredDocs.filter(doc => 
-            doc.sourceInstitution.includes(filters.region)
-          );
+        // Appliquer le tri
+        if (filterCriteria.sortBy) {
+          const direction = filterCriteria.sortDirection === 'desc' ? -1 : 1;
+          const sortKey = filterCriteria.sortBy as keyof Document;
+          
+          filteredDocs.sort((a, b) => {
+            const valueA = a[sortKey];
+            const valueB = b[sortKey];
+            
+            if (valueA instanceof Date && valueB instanceof Date) {
+              return direction * (valueA.getTime() - valueB.getTime());
+            }
+            
+            if (typeof valueA === 'string' && typeof valueB === 'string') {
+              return direction * valueA.localeCompare(valueB);
+            }
+            
+            if (valueA !== undefined && valueB !== undefined) {
+              if (valueA < valueB) return -1 * direction;
+              if (valueA > valueB) return 1 * direction;
+            }
+            return 0;
+          });
         }
         
-        if (filters.path) {
-          filteredDocs = filteredDocs.filter(doc => 
-            doc.path.startsWith(filters.path)
-          );
+        // Appliquer la pagination si nécessaire
+        if (filterCriteria.pageSize && filterCriteria.pageIndex !== undefined) {
+          const startIndex = filterCriteria.pageIndex * filterCriteria.pageSize;
+          filteredDocs = filteredDocs.slice(startIndex, startIndex + filterCriteria.pageSize);
         }
       }
       
-      return of(filteredDocs);
+      // Simuler un délai réseau
+      return of(filteredDocs).pipe(delay(300));
+    }
+  }
+
+  private applyFilterCriterion(docs: Document[], key: string, value: any): Document[] {
+    switch (key) {
+      case 'searchTerm':
+        return docs.filter(doc => 
+          doc.originalName.toLowerCase().includes(value.toLowerCase()) || 
+          (doc.concernedPerson1 && doc.concernedPerson1.toLowerCase().includes(value.toLowerCase())) ||
+          (doc.concernedPerson2 && doc.concernedPerson2.toLowerCase().includes(value.toLowerCase())) ||
+          (doc.sourceInstitution && doc.sourceInstitution.toLowerCase().includes(value.toLowerCase()))
+        );
+        
+      case 'documentType':
+        if (Array.isArray(value)) {
+          return docs.filter(doc => value.includes(doc.type));
+        }
+        return docs.filter(doc => doc.type === value);
+        
+      case 'region':
+        if (Array.isArray(value)) {
+          return docs.filter(doc => 
+            value.some(region => doc.sourceInstitution.includes(region) || doc.path.includes(region))
+          );
+        }
+        return docs.filter(doc => 
+          doc.sourceInstitution.includes(value) || doc.path.includes(value)
+        );
+        
+      case 'startDate':
+        const startDate = value instanceof Date ? value : new Date(value);
+        return docs.filter(doc => doc.creationDate >= startDate);
+        
+      case 'endDate':
+        const endDate = value instanceof Date ? value : new Date(value);
+        return docs.filter(doc => doc.creationDate <= endDate);
+        
+      case 'concernedPerson':
+        return docs.filter(doc => 
+          (doc.concernedPerson1 && doc.concernedPerson1.toLowerCase().includes(value.toLowerCase())) ||
+          (doc.concernedPerson2 && doc.concernedPerson2.toLowerCase().includes(value.toLowerCase()))
+        );
+        
+      case 'sourceInstitution':
+        return docs.filter(doc => 
+          doc.sourceInstitution.toLowerCase().includes(value.toLowerCase())
+        );
+        
+      case 'creator':
+        return docs.filter(doc => 
+          doc.creator.toLowerCase().includes(value.toLowerCase())
+        );
+        
+      case 'lastModifier':
+        return docs.filter(doc => 
+          doc.lastModifier.toLowerCase().includes(value.toLowerCase())
+        );
+        
+      case 'path':
+        return docs.filter(doc => doc.path.startsWith(value));
+        
+      default:
+        return docs;
+    }
+  }
+
+  searchDocuments(term: string, options?: {
+    fullText?: boolean,
+    exactMatch?: boolean,
+    caseSensitive?: boolean,
+    fields?: string[]
+  }): Observable<Document[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<Document[]>(`${this.apiUrl}/documents/search`, {
+        params: {
+          term,
+          fullText: options?.fullText ? 'true' : 'false',
+          exactMatch: options?.exactMatch ? 'true' : 'false',
+          caseSensitive: options?.caseSensitive ? 'true' : 'false',
+          fields: options?.fields ? options.fields.join(',') : ''
+        }
+      }).pipe(
+        catchError(error => {
+          console.error('Error searching documents', error);
+          return throwError(() => new Error('Failed to search documents. Please try again later.'));
+        })
+      );
+    } else {
+      // Mode mock pour la recherche avancée
+      if (!term) {
+        return of([]);
+      }
+      
+      const searchTerm = options?.caseSensitive ? term : term.toLowerCase();
+      
+      // Définir les champs à rechercher
+      const fieldsToSearch = options?.fields || [
+        'originalName', 'concernedPerson1', 'concernedPerson2', 
+        'sourceInstitution', 'creator', 'lastModifier'
+      ];
+      
+      // Copier les documents mock
+      let results = [...this.mockDocuments];
+      
+      // Filtrer par terme de recherche
+      results = results.filter(doc => {
+        return fieldsToSearch.some(field => {
+          const fieldValue = doc[field as keyof Document];
+          
+          if (typeof fieldValue !== 'string') {
+            return false;
+          }
+          
+          const value = options?.caseSensitive ? fieldValue : fieldValue.toLowerCase();
+          
+          if (options?.exactMatch) {
+            return value === searchTerm;
+          } else {
+            return value.includes(searchTerm);
+          }
+        });
+      });
+      
+      return of(results).pipe(delay(300));
     }
   }
 
@@ -148,7 +326,7 @@ export class DocumentService {
   }
 
   // Méthodes de navigation temporelle
-  
+
   getYearFolders(documentType: string): Observable<Folder[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Folder[]>(`${this.apiUrl}/folders/years`, {
@@ -163,7 +341,7 @@ export class DocumentService {
       // Simuler la récupération des dossiers par année
       const currentYear = new Date().getFullYear();
       const oldestYear = currentYear - 5; // Simulation d'un document de 5 ans
-      
+
       const folders: Folder[] = [];
       for (let year = currentYear; year >= oldestYear; year--) {
         folders.push({
@@ -173,7 +351,7 @@ export class DocumentService {
           lastModificationDate: new Date(year, 11, 31)
         });
       }
-      
+
       return of(folders);
     }
   }
@@ -196,17 +374,17 @@ export class DocumentService {
       const year = parseInt(yearString.substring(0, 4), 10);
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth();
-      
+
       const monthNames = [
         'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
         'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
       ];
-      
+
       const folders: Folder[] = [];
-      
+
       // Pour l'année en cours, afficher seulement jusqu'au mois actuel
       const monthLimit = (year === currentYear) ? currentMonth + 1 : 12;
-      
+
       for (let month = 0; month < monthLimit; month++) {
         folders.push({
           name: monthNames[month],
@@ -215,7 +393,7 @@ export class DocumentService {
           lastModificationDate: new Date(year, month, 28)
         });
       }
-      
+
       return of(folders);
     }
   }
@@ -235,20 +413,20 @@ export class DocumentService {
       const pathParts = monthPath.split('/');
       const yearStr = pathParts[pathParts.length - 3];
       const monthStr = pathParts[pathParts.length - 2];
-      
+
       const year = parseInt(yearStr, 10);
       const month = parseInt(monthStr, 10) - 1; // Les mois commencent à 0 en JavaScript
-      
+
       // Déterminer le nombre de jours dans le mois
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      
+
       const folders: Folder[] = [];
-      
+
       // Créer un dossier pour chaque jour du mois
       for (let day = 1; day <= daysInMonth; day++) {
         // Vérifier si nous avons des documents pour ce jour (simulation)
         const hasDocuments = Math.random() > 0.7; // 30% de chances d'avoir des documents
-        
+
         if (hasDocuments) {
           folders.push({
             name: day.toString().padStart(2, '0'),
@@ -258,13 +436,13 @@ export class DocumentService {
           });
         }
       }
-      
+
       return of(folders);
     }
   }
 
   // Méthodes de navigation géographique
-  
+
   getRegionFolders(documentType: string): Observable<Folder[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Folder[]>(`${this.apiUrl}/folders/regions`, {
@@ -281,35 +459,35 @@ export class DocumentService {
         {
           name: 'Kayes',
           path: `/Archives/${documentType}/Kayes/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         },
         {
           name: 'Koulikoro',
           path: `/Archives/${documentType}/Koulikoro/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         },
         {
           name: 'Sikasso',
           path: `/Archives/${documentType}/Sikasso/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         },
         {
           name: 'Ségou',
           path: `/Archives/${documentType}/Ségou/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         },
         {
           name: 'Mopti',
           path: `/Archives/${documentType}/Mopti/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         },
         {
           name: 'District de Bamako',
           path: `/Archives/${documentType}/District de Bamako/`,
-          type: 'region' as 'region' 
+          type: 'region' as 'region'
         }
       ];
-      
+
       return of(regions);
     }
   }
@@ -328,25 +506,25 @@ export class DocumentService {
       // Simuler la récupération des dossiers par cercle
       const pathParts = regionPath.split('/');
       const region = pathParts[pathParts.length - 2];
-      
+
       // Cas particulier pour le District de Bamako
       if (region === 'District de Bamako') {
         // Le District de Bamako n'a pas de cercles, mais directement des communes
         return this.getCommuneFolders(regionPath);
       }
-      
+
       // Pour les autres régions, générer des cercles
       const circles: Folder[] = [];
-      
+
       // Nombre de cercles selon la région
       let circleCount = 5;
-      
+
       if (region === 'Kayes') circleCount = 7;
       else if (region === 'Koulikoro') circleCount = 7;
       else if (region === 'Sikasso') circleCount = 7;
       else if (region === 'Ségou') circleCount = 7;
       else if (region === 'Mopti') circleCount = 8;
-      
+
       for (let i = 1; i <= circleCount; i++) {
         circles.push({
           name: `Cercle de ${region} ${i}`,
@@ -354,7 +532,7 @@ export class DocumentService {
           type: 'circle'
         });
       }
-      
+
       return of(circles);
     }
   }
@@ -373,9 +551,9 @@ export class DocumentService {
       // Simuler la récupération des dossiers par commune
       const pathParts = circlePath.split('/');
       const parentName = pathParts[pathParts.length - 2];
-      
+
       const communes: Folder[] = [];
-      
+
       // Cas particulier pour le District de Bamako
       if (parentName === 'District de Bamako') {
         // Les communes du District de Bamako
@@ -389,7 +567,7 @@ export class DocumentService {
       } else {
         // Pour les cercles, générer des communes
         const communeCount = 5; // Nombre arbitraire pour la simulation
-        
+
         for (let i = 1; i <= communeCount; i++) {
           communes.push({
             name: `Commune de ${parentName.replace('Cercle de ', '')} ${i}`,
@@ -398,7 +576,7 @@ export class DocumentService {
           });
         }
       }
-      
+
       return of(communes);
     }
   }
@@ -416,10 +594,10 @@ export class DocumentService {
     } else {
       // Simuler la récupération des dossiers par centre d'état civil
       const centers: Folder[] = [];
-      
+
       // Nombre arbitraire de centres pour la simulation
       const centerCount = 3;
-      
+
       for (let i = 1; i <= centerCount; i++) {
         centers.push({
           name: `Centre d'État Civil ${String.fromCharCode(64 + i)}`,
@@ -427,8 +605,188 @@ export class DocumentService {
           type: 'center'
         });
       }
-      
+
       return of(centers);
+    }
+  }
+
+  // Méthodes pour les commentaires
+  getDocumentComments(documentId: string): Observable<DocumentComment[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<DocumentComment[]>(`${this.apiUrl}/documents/${documentId}/comments`).pipe(
+        catchError(error => {
+          console.error('Error fetching document comments', error);
+          return throwError(() => new Error('Failed to load document comments. Please try again later.'));
+        })
+      );
+    } else {
+      // Mode simulation pour le développement
+      return of([
+        {
+          id: '1',
+          documentId: documentId,
+          userId: '1',
+          userName: 'Admin Utilisateur',
+          text: 'Document vérifié et approuvé.',
+          creationDate: new Date(2023, 5, 15)
+        },
+        {
+          id: '2',
+          documentId: documentId,
+          userId: '2',
+          userName: 'Amadou Touré',
+          text: 'Informations confirmées avec le centre d\'état civil.',
+          creationDate: new Date(2023, 5, 16)
+        }
+      ]).pipe(delay(300)); // Simuler un délai réseau
+    }
+  }
+
+  addDocumentComment(documentId: string, text: string): Observable<DocumentComment> {
+    if (this.authService.isApiMode()) {
+      return this.http.post<DocumentComment>(`${this.apiUrl}/documents/${documentId}/comments`, { text }).pipe(
+        catchError(error => {
+          console.error('Error adding document comment', error);
+          return throwError(() => new Error('Failed to add comment. Please try again later.'));
+        })
+      );
+    } else {
+      // Mode simulation pour le développement
+      const currentUser = this.authService.getCurrentUser();
+      const newComment: DocumentComment = {
+        id: Math.random().toString(36).substr(2, 9),
+        documentId: documentId,
+        userId: currentUser?.id || '1',
+        userName: `${currentUser?.firstName || 'Admin'} ${currentUser?.lastName || 'Utilisateur'}`,
+        text: text,
+        creationDate: new Date()
+      };
+      return of(newComment).pipe(delay(300)); // Simuler un délai réseau
+    }
+  }
+
+  // Méthodes pour l'historique des actions
+  getDocumentActionHistory(documentId: string): Observable<DocumentAction[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<DocumentAction[]>(`${this.apiUrl}/documents/${documentId}/actions`).pipe(
+        catchError(error => {
+          console.error('Error fetching document action history', error);
+          return throwError(() => new Error('Failed to load document action history. Please try again later.'));
+        })
+      );
+    } else {
+      // Mode simulation pour le développement
+      return of([
+        {
+          id: '1',
+          documentId: documentId,
+          userId: '1',
+          userName: 'Admin Utilisateur',
+          actionType: ActionType.VIEW,
+          actionDate: new Date(2023, 5, 15, 10, 30)
+        },
+        {
+          id: '2',
+          documentId: documentId,
+          userId: '1',
+          userName: 'Admin Utilisateur',
+          actionType: ActionType.DOWNLOAD,
+          actionDate: new Date(2023, 5, 15, 10, 32)
+        },
+        {
+          id: '3',
+          documentId: documentId,
+          userId: '2',
+          userName: 'Amadou Touré',
+          actionType: ActionType.SHARE,
+          actionDate: new Date(2023, 5, 16, 14, 15),
+          details: 'Partagé avec direction@example.com'
+        }
+      ]).pipe(delay(300)); // Simuler un délai réseau
+    }
+  }
+
+  recordDocumentAction(documentId: string, actionType: ActionType, details?: string): Observable<DocumentAction> {
+    if (this.authService.isApiMode()) {
+      return this.http.post<DocumentAction>(`${this.apiUrl}/documents/${documentId}/actions`, {
+        actionType,
+        details
+      }).pipe(
+        catchError(error => {
+          console.error('Error recording document action', error);
+          return throwError(() => new Error('Failed to record action. Please try again later.'));
+        })
+      );
+    } else {
+      // Mode simulation pour le développement
+      const currentUser = this.authService.getCurrentUser();
+      const newAction: DocumentAction = {
+        id: Math.random().toString(36).substr(2, 9),
+        documentId: documentId,
+        userId: currentUser?.id || '1',
+        userName: `${currentUser?.firstName || 'Admin'} ${currentUser?.lastName || 'Utilisateur'}`,
+        actionType: actionType,
+        actionDate: new Date(),
+        details: details
+      };
+      return of(newAction).pipe(delay(100)); // Simuler un délai réseau minimal
+    }
+  }
+
+  // Méthode pour obtenir une prévisualisation légère du document
+  getDocumentPreview(documentId: string): Observable<Blob> {
+    if (this.authService.isApiMode()) {
+      return this.http.get(`${this.apiUrl}/documents/${documentId}/preview`, {
+        responseType: 'blob'
+      }).pipe(
+        catchError(error => {
+          console.error('Error getting document preview', error);
+          return throwError(() => new Error('Failed to load document preview. Please try again later.'));
+        })
+      );
+    } else {
+      // Utiliser le simulateur en mode prévisualisation
+      const document = this.mockDocuments.find(doc => doc.id === documentId);
+      if (!document) {
+        return throwError(() => new Error('Document not found'));
+      }
+      
+      const simulatedPreview = this.documentSimulator.generateSimulatedPdf(documentId, document.type, true);
+      
+      // Délai plus court pour la prévisualisation
+      return of(simulatedPreview).pipe(delay(350));
+    }
+  }
+
+  // Méthode pour comparer deux versions d'un document
+  compareDocumentVersions(documentId: string, version1: number, version2: number): Observable<Blob> {
+    if (this.authService.isApiMode()) {
+      return this.http.get(`${this.apiUrl}/documents/${documentId}/compare`, {
+        params: new HttpParams()
+          .set('version1', version1.toString())
+          .set('version2', version2.toString()),
+        responseType: 'blob'
+      }).pipe(
+        catchError(error => {
+          console.error('Error comparing document versions', error);
+          return throwError(() => new Error('Failed to compare document versions. Please try again later.'));
+        })
+      );
+    } else {
+      // Générer un document de comparaison simulé
+      const document = this.mockDocuments.find(doc => doc.id === documentId);
+      if (!document) {
+        return throwError(() => new Error('Document not found'));
+      }
+      
+      // Créer un contenu simulé spécial pour la comparaison
+      const simulatedComparison = this.documentSimulator.generateSimulatedPdf(
+        `${documentId}_v${version1}_vs_v${version2}`, 
+        `Comparaison ${document.type}`, 
+        false
+      );
+      
+      return of(simulatedComparison).pipe(delay(800));
     }
   }
 
@@ -436,15 +794,15 @@ export class DocumentService {
   loadFolders(path: string, navigationType: 'time' | 'location'): Observable<Folder[]> {
     // Analyser le chemin pour déterminer le niveau actuel
     const pathParts = path.split('/').filter(part => part !== '');
-    
+
     // Si nous sommes à la racine, retourner les types de documents
     if (pathParts.length === 0 || (pathParts.length === 1 && pathParts[0] === 'Archives')) {
       return this.getRootFolders();
     }
-    
+
     // Récupérer le type de document (toujours le premier élément après "Archives")
     const documentType = pathParts[1];
-    
+
     if (navigationType === 'time') {
       // Navigation par temps
       if (pathParts.length === 2) {
@@ -473,7 +831,7 @@ export class DocumentService {
         return this.getCivilStatusCenterFolders(path);
       }
     }
-    
+
     // Si le niveau n'est pas reconnu, retourner un tableau vide
     return of([]);
   }
@@ -489,48 +847,84 @@ export class DocumentService {
     } else {
       // Simuler les versions d'un document
       const document = this.mockDocuments.find(doc => doc.id === documentId);
-      
+
       if (!document) {
         return throwError(() => new Error('Document not found'));
       }
-      
+
       const versions: Document[] = [
         { ...document },
-        { 
+        {
           ...document,
           id: `${document.id}_v1`,
           version: document.version - 1,
           lastModificationDate: new Date(document.lastModificationDate.getTime() - 7 * 24 * 60 * 60 * 1000)
         }
       ];
-      
+
       return of(versions);
     }
   }
 
   downloadDocument(documentId: string): Observable<Blob> {
-    if (this.authService.isApiMode()) {
-      return this.http.get(`${this.apiUrl}/documents/${documentId}/download`, {
-        responseType: 'blob'
-      }).pipe(
-        catchError(error => {
-          console.error('Error downloading document', error);
-          return throwError(() => new Error('Failed to download document. Please try again later.'));
-        })
-      );
-    } else {
-      // Simuler le téléchargement d'un document (pour la démonstration)
-      const dummyPdfContent = new Blob(['Contenu PDF simulé'], { type: 'application/pdf' });
-      return of(dummyPdfContent);
-    }
+    // Vérifier les permissions avant de télécharger
+    return this.permissionService.checkPermission(
+      PermissionType.DOWNLOAD, 
+      'document', 
+      documentId
+    ).pipe(
+      switchMap(result => {
+        if (!result.granted) {
+          return throwError(() => new Error(result.reason || 'Permission denied'));
+        }
+        
+        // Permission accordée, procéder au téléchargement
+        if (this.authService.isApiMode()) {
+          return this.http.get(`${this.apiUrl}/documents/${documentId}/download`, {
+            responseType: 'blob'
+          }).pipe(
+            tap(() => {
+              // Enregistrer l'action de téléchargement
+              this.recordDocumentAction(documentId, ActionType.DOWNLOAD).subscribe();
+            }),
+            catchError(error => {
+              console.error('Error downloading document', error);
+              return throwError(() => new Error('Failed to download document. Please try again later.'));
+            })
+          );
+        } else {
+          // Code existant du mode simulation...
+          const document = this.mockDocuments.find(doc => doc.id === documentId);
+          if (!document) {
+            return throwError(() => new Error('Document not found'));
+          }
+          
+          const simulatedPdf = this.documentSimulator.generateSimulatedPdf(documentId, document.type, false);
+          
+          // Simuler un délai réseau réaliste pour le téléchargement complet
+          return of(simulatedPdf).pipe(
+            delay(1200),
+            tap(() => {
+              // Enregistrer l'action de téléchargement
+              this.recordDocumentAction(documentId, ActionType.DOWNLOAD).subscribe();
+            })
+          );
+        }
+      })
+    );
   }
 
-  shareDocumentByEmail(documentId: string, emailAddress: string): Observable<boolean> {
+  shareDocumentByEmail(documentId: string, emailAddress: string, options?: {
+    subject?: string,
+    message?: string,
+    includePreview?: boolean
+  }): Observable<boolean> {
     if (this.authService.isApiMode()) {
       return this.http.post<boolean>(`${this.apiUrl}/documents/${documentId}/share`, { 
         emailAddress,
-        subject: 'Partage de document',
-        message: 'Veuillez trouver ci-joint le document demandé.'
+        subject: options?.subject || 'Partage de document',
+        message: options?.message || 'Veuillez trouver ci-joint le document demandé.',
+        includePreview: options?.includePreview !== undefined ? options.includePreview : true
       }).pipe(
         catchError(error => {
           console.error('Error sharing document', error);
@@ -540,6 +934,8 @@ export class DocumentService {
     } else {
       // Mode simulation amélioré
       console.log(`Document ${documentId} partagé avec ${emailAddress}`);
+      console.log('Options:', options);
+      
       // Simuler un délai réseau plus réaliste
       return of(true).pipe(delay(800));
     }
@@ -608,11 +1004,11 @@ export class DocumentService {
 
   canUserAccessDocument(documentId: string): Observable<boolean> {
     const currentUser = this.authService.getCurrentUser();
-    
+
     if (!currentUser) {
       return of(false);
     }
-    
+
     // En mode API, vérifier l'accès via le backend
     if (this.authService.isApiMode()) {
       return this.http.get<boolean>(`${this.apiUrl}/documents/${documentId}/access-check`).pipe(
@@ -624,25 +1020,25 @@ export class DocumentService {
     } else {
       // En mode mock, vérifier en fonction du rôle et du niveau de responsabilité
       const document = this.mockDocuments.find(doc => doc.id === documentId);
-      
+
       if (!document) {
         return of(false);
       }
-      
+
       // Accès pour l'administrateur
       if (currentUser.role === UserRole.ADMIN) {
         return of(true);
       }
-      
+
       // Accès pour les utilisateurs selon leur niveau et zone
       const documentRegion = this.extractRegionFromPath(document.path);
-      
+
       if (currentUser.level === UserLevel.REGIONAL && currentUser.regions?.includes(documentRegion)) {
         return of(true);
       }
-      
+
       const documentCenter = this.extractCenterFromPath(document.path);
-      
+
       if (
         (currentUser.level === UserLevel.CENTER && currentUser.centers?.includes(documentCenter)) ||
         (currentUser.level === UserLevel.COURT && document.sourceInstitution.includes('Tribunal')) ||
@@ -650,7 +1046,7 @@ export class DocumentService {
       ) {
         return of(true);
       }
-      
+
       return of(false);
     }
   }
@@ -659,13 +1055,13 @@ export class DocumentService {
     const regions = [
       'Kayes', 'Koulikoro', 'Sikasso', 'Ségou', 'Mopti', 'District de Bamako'
     ];
-    
+
     for (const region of regions) {
       if (path.includes(region)) {
         return region;
       }
     }
-    
+
     return '';
   }
 

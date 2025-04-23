@@ -1,0 +1,60 @@
+<div class="comments-container">
+    <h6 class="comments-title">Commentaires</h6>
+    
+    <!-- Formulaire d'ajout de commentaire -->
+    <form [formGroup]="commentForm" (ngSubmit)="addComment()" class="comment-form mb-3">
+      <div class="form-group">
+        <textarea 
+          class="form-control" 
+          formControlName="text" 
+          rows="2" 
+          placeholder="Ajouter un commentaire..."
+          [ngClass]="{'is-invalid': commentForm.get('text')?.invalid && commentForm.get('text')?.touched}"
+        ></textarea>
+        <div class="invalid-feedback" *ngIf="commentForm.get('text')?.errors?.['required']">
+          Le commentaire ne peut pas être vide.
+        </div>
+        <div class="invalid-feedback" *ngIf="commentForm.get('text')?.errors?.['minlength']">
+          Le commentaire doit contenir au moins 2 caractères.
+        </div>
+        <div class="invalid-feedback" *ngIf="commentForm.get('text')?.errors?.['maxlength']">
+          Le commentaire ne peut pas dépasser 500 caractères.
+        </div>
+      </div>
+      <div class="d-flex justify-content-end mt-2">
+        <button 
+          type="submit" 
+          class="btn btn-sm btn-primary" 
+          [disabled]="commentForm.invalid || isLoading"
+        >
+          <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+          Ajouter
+        </button>
+      </div>
+    </form>
+    
+    <!-- Listing des commentaires -->
+    <div class="comments-list">
+      <div *ngIf="isLoading && comments.length === 0" class="text-center py-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Chargement...</span>
+        </div>
+      </div>
+      
+      <div *ngIf="errorMessage" class="alert alert-danger">
+        {{ errorMessage }}
+      </div>
+      
+      <div *ngIf="!isLoading && comments.length === 0" class="text-center text-muted py-3">
+        Aucun commentaire pour ce document.
+      </div>
+      
+      <div *ngFor="let comment of comments" class="comment-item">
+        <div class="comment-header">
+          <div class="comment-author">{{ comment.userName }}</div>
+          <div class="comment-date">{{ comment.creationDate | date:'dd/MM/yyyy HH:mm' }}</div>
+        </div>
+        <div class="comment-text">{{ comment.text }}</div>
+      </div>
+    </div>
+  </div>

@@ -1,18 +1,24 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Document, Folder } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
+import { FilterCriteria } from '../../models/filter.model';
+import { FilterService } from '../../services/filter.service';
+import { Subject, takeUntil } from 'rxjs';
+import { PermissionService } from '../../services/permission.service';
+import { PermissionType } from '../../models/permission.model';
 
 @Component({
   selector: 'app-archive',
   templateUrl: './archive.component.html',
   styleUrls: ['./archive.component.scss']
 })
-export class ArchiveComponent implements OnInit {
+export class ArchiveComponent implements OnInit, OnDestroy {
   viewMode: 'list' | 'grid' = 'list';
   navigationMode: 'time' | 'location' = 'time';
   currentPath: string = '/Archives';
+  sidebarMode: 'tree' | 'quick' = 'tree';
   breadcrumbSegments: { name: string; path: string }[] = [
     { name: 'Archives', path: '/Archives' }
   ];
@@ -23,17 +29,38 @@ export class ArchiveComponent implements OnInit {
   errorMessage = '';
   navigationHistory: string[] = ['/Archives'];
   historyIndex = 0;
+  
+  // Nouvelles propriétés pour la recherche et le filtrage
+  isSearchMode = false;
+  searchTerm = '';
+  currentFilter: FilterCriteria | null = null;
+  
+  private destroy$ = new Subject<void>();
 
   constructor(
     private documentService: DocumentService,
     private router: Router,
     private route: ActivatedRoute,
-    private location: Location
+    private location: Location,
+    private filterService: FilterService,
+    private permissionService: PermissionService
   ) { }
 
   ngOnInit(): void {
     // Charger les préférences utilisateur
     this.loadUserPreferences();
+
+    // S'abonner aux changements de filtre
+    this.filterService.currentFilter$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(filter => {
+      this.currentFilter = filter?.criteria || null;
+      
+      // Si nous sommes en mode recherche, mettre à jour les résultats
+      if (this.isSearchMode) {
+        this.applyFilters(this.currentFilter || {});
+      }
+    });
 
     // Récupérer le chemin depuis les paramètres d'URL, s'il existe
     this.route.queryParams.subscribe(params => {
@@ -47,9 +74,20 @@ export class ArchiveComponent implements OnInit {
       if (params['mode']) {
         this.navigationMode = params['mode'] as 'time' | 'location';
       }
-
-      this.loadFolderContent();
+      
+      if (params['search']) {
+        this.searchTerm = params['search'];
+        this.isSearchMode = true;
+      } else {
+        this.isSearchMode = false;
+        this.loadFolderContent();
+      }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   loadUserPreferences(): void {
@@ -63,12 +101,18 @@ export class ArchiveComponent implements OnInit {
     if (storedNavigationMode) {
       this.navigationMode = storedNavigationMode as 'time' | 'location';
     }
+    
+    const storedSidebarMode = localStorage.getItem('archiveSidebarMode');
+    if (storedSidebarMode) {
+      this.sidebarMode = storedSidebarMode as 'tree' | 'quick';
+    }
   }
 
   saveUserPreferences(): void {
     // Sauvegarder les préférences dans le localStorage
     localStorage.setItem('archiveViewMode', this.viewMode);
     localStorage.setItem('archiveNavigationMode', this.navigationMode);
+    localStorage.setItem('archiveSidebarMode', this.sidebarMode);
   }
 
   loadFolderContent(): void {
@@ -100,7 +144,13 @@ export class ArchiveComponent implements OnInit {
   }
 
   loadDocuments(): void {
-    this.documentService.getDocuments({ path: this.currentPath }).subscribe({
+    // Utiliser le filtre courant avec le chemin actuel
+    const filter: FilterCriteria = {
+      ...(this.currentFilter || {}),
+      path: this.currentPath
+    };
+    
+    this.documentService.getDocuments(filter).subscribe({
       next: (documents) => {
         this.currentDocuments = documents;
         this.isLoading = false;
@@ -114,18 +164,35 @@ export class ArchiveComponent implements OnInit {
   }
 
   openFolder(folder: Folder): void {
-    // Naviguer vers le dossier sélectionné
-    this.currentPath = folder.path;
-    this.updateBreadcrumb();
+    // Vérifier les permissions
+    this.permissionService.checkPermission(PermissionType.VIEW, 'folder', folder.path).subscribe({
+      next: (result) => {
+        if (result.granted) {
+          // Naviguer vers le dossier sélectionné
+          this.currentPath = folder.path;
+          this.updateBreadcrumb();
 
-    // Mettre à jour l'URL sans recharger la page
-    this.updateUrlParams();
+          // Mettre à jour l'URL sans recharger la page
+          this.updateUrlParams();
 
-    // Ajouter à l'historique de navigation
-    this.addToHistory(this.currentPath);
+          // Ajouter à l'historique de navigation
+          this.addToHistory(this.currentPath);
 
-    // Charger le contenu du dossier
-    this.loadFolderContent();
+          // Charger le contenu du dossier
+          this.loadFolderContent();
+          
+          // Désactiver le mode recherche
+          this.isSearchMode = false;
+          this.searchTerm = '';
+        } else {
+          this.errorMessage = result.reason || 'Accès refusé à ce dossier';
+        }
+      },
+      error: (error) => {
+        console.error('Erreur lors de la vérification des permissions', error);
+        this.errorMessage = 'Erreur lors de la vérification des permissions';
+      }
+    });
   }
 
   updateBreadcrumb(): void {
@@ -168,7 +235,8 @@ export class ArchiveComponent implements OnInit {
       relativeTo: this.route,
       queryParams: {
         path: this.currentPath,
-        mode: this.navigationMode
+        mode: this.navigationMode,
+        search: this.isSearchMode ? this.searchTerm : null
       },
       queryParamsHandling: 'merge',
       replaceUrl: true
@@ -191,6 +259,10 @@ export class ArchiveComponent implements OnInit {
     
     // Charger le contenu du dossier
     this.loadFolderContent();
+    
+    // Désactiver le mode recherche
+    this.isSearchMode = false;
+    this.searchTerm = '';
   }
   
   // Méthode pour nettoyer les chemins anormaux
@@ -231,11 +303,31 @@ export class ArchiveComponent implements OnInit {
 
     // Charger le contenu du dossier
     this.loadFolderContent();
+    
+    // Désactiver le mode recherche
+    this.isSearchMode = false;
+  }
+  
+  setSidebarMode(mode: 'tree' | 'quick'): void {
+    this.sidebarMode = mode;
+    this.saveUserPreferences();
   }
 
   openDocument(document: Document): void {
-    this.selectedDocument = document;
-    // Ici, ouvrir une modal ou un panneau latéral pour afficher le document
+    // Vérifier les permissions avant d'ouvrir
+    this.permissionService.checkPermission(PermissionType.VIEW, 'document', document.id).subscribe({
+      next: (result) => {
+        if (result.granted) {
+          this.selectedDocument = document;
+        } else {
+          this.errorMessage = result.reason || 'Accès refusé à ce document';
+        }
+      },
+      error: (error) => {
+        console.error('Erreur lors de la vérification des permissions', error);
+        this.errorMessage = 'Erreur lors de la vérification des permissions';
+      }
+    });
   }
 
   closePreview(): void {
@@ -243,24 +335,19 @@ export class ArchiveComponent implements OnInit {
   }
 
   // Gestion de l'historique de navigation
-
   addToHistory(path: string): void {
     // Supprimer tout ce qui se trouve après l'index actuel
     this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
-    this.navigationHistory.push(path);
-    this.historyIndex = this.navigationHistory.length - 1;
-
+    
     // Ne pas ajouter si le chemin est identique au dernier
     if (this.navigationHistory.length > 0 &&
       this.navigationHistory[this.historyIndex] === path) {
       return;
     }
-
-    // Ajouter le nouveau chemin s'il est différent du dernier
-    if (this.navigationHistory[this.navigationHistory.length - 1] !== path) {
-      this.navigationHistory.push(path);
-      this.historyIndex = this.navigationHistory.length - 1;
-    }
+    
+    // Ajouter le nouveau chemin
+    this.navigationHistory.push(path);
+    this.historyIndex = this.navigationHistory.length - 1;
   }
 
   navigateBack(): void {
@@ -269,6 +356,12 @@ export class ArchiveComponent implements OnInit {
       this.currentPath = this.navigationHistory[this.historyIndex];
       this.updateBreadcrumb();
       this.updateUrlParams();
+      
+      // Si nous sommes en mode recherche, revenir en mode navigation
+      if (this.isSearchMode) {
+        this.isSearchMode = false;
+      }
+      
       this.loadFolderContent();
     }
   }
@@ -279,6 +372,12 @@ export class ArchiveComponent implements OnInit {
       this.currentPath = this.navigationHistory[this.historyIndex];
       this.updateBreadcrumb();
       this.updateUrlParams();
+      
+      // Si nous sommes en mode recherche, revenir en mode navigation
+      if (this.isSearchMode) {
+        this.isSearchMode = false;
+      }
+      
       this.loadFolderContent();
     }
   }
@@ -292,28 +391,75 @@ export class ArchiveComponent implements OnInit {
   }
 
   openInNewTab(folder: Folder): void {
-    // Ouvrir le dossier dans un nouvel onglet
+    // Créer l'URL avec les paramètres du dossier
     const url = this.router.createUrlTree([], {
       relativeTo: this.route,
       queryParams: {
         path: folder.path,
-        mode: this.navigationMode
+        mode: this.navigationMode,
+        view: this.viewMode,
+        source: 'newtab'
       }
     }).toString();
 
+    // Ouvrir dans un nouvel onglet
     window.open(url, '_blank');
+    
+    // Enregistrer dans l'historique de navigation local (facultatif)
+    localStorage.setItem(`lastOpenedFolder_${folder.path}`, JSON.stringify({
+      time: new Date().getTime(),
+      name: folder.name,
+      path: folder.path,
+      mode: this.navigationMode
+    }));
   }
 
-  applyFilters(filters: any): void {
-    // Appliquer les filtres à la liste des documents
-    this.documentService.getDocuments({ ...filters, path: this.currentPath }).subscribe({
-      next: (documents) => {
-        this.currentDocuments = documents;
-      },
-      error: (error) => {
-        console.error('Error applying filters', error);
-        this.errorMessage = `Erreur lors de l'application des filtres: ${error.message}`;
-      }
+  openMultipleTabsForFolders(folders: Folder[]): void {
+    // Limiter le nombre d'onglets à ouvrir pour éviter le blocage par le navigateur
+    const maxTabs = 5;
+    const foldersToOpen = folders.slice(0, maxTabs);
+    
+    if (folders.length > maxTabs) {
+      alert(`Pour des raisons de sécurité, seuls les ${maxTabs} premiers dossiers seront ouverts.`);
+    }
+    
+    // Ouvrir chaque dossier dans un nouvel onglet
+    foldersToOpen.forEach(folder => {
+      setTimeout(() => {
+        this.openInNewTab(folder);
+      }, 100); // Léger délai pour éviter les problèmes avec certains navigateurs
     });
+  }
+
+  applyFilters(filters: FilterCriteria): void {
+    // Mettre à jour le filtre courant
+    this.currentFilter = filters;
+    
+    // Si nous sommes en mode navigation, appliquer les filtres aux documents actuels
+    if (!this.isSearchMode) {
+      this.loadDocuments();
+    } else {
+      // En mode recherche, rafraîchir les résultats
+      // La mise à jour du filtre déclenchera automatiquement la mise à jour des résultats
+    }
+  }
+  
+  onSearch(term: string): void {
+    this.searchTerm = term;
+    
+    if (term) {
+      // Activer le mode recherche
+      this.isSearchMode = true;
+      
+      // Mettre à jour l'URL
+      this.updateUrlParams();
+      
+      // Ajouter à l'historique de navigation
+      this.addToHistory(this.currentPath);
+    } else {
+      // Si le terme est vide, revenir en mode navigation
+      this.isSearchMode = false;
+      this.loadFolderContent();
+    }
   }
 }

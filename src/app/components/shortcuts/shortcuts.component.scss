@@ -1,0 +1,65 @@
+.shortcuts-container {
+    padding: 15px;
+}
+
+.shortcuts-title {
+    margin-bottom: 20px;
+    color: #495057;
+    font-size: 1.2rem;
+}
+
+.shortcut-section {
+    margin-bottom: 25px;
+}
+
+.section-title {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.shortcut-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.shortcut-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15px 10px;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+        background-color: #f8f9fa;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .shortcut-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+
+    .shortcut-name {
+        font-size: 0.8rem;
+        text-align: center;
+        font-weight: 500;
+        color: #495057;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2; // Ajoutez cette ligne
+        -webkit-box-orient: vertical;
+        height: 32px;
+    }
+}

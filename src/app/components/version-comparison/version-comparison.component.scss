@@ -1,0 +1,68 @@
+.comparison-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1060; // Plus élevé que la prévisualisation normale
+  }
+  
+  .comparison-container {
+    width: 95%;
+    height: 95%;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  .comparison-header {
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .comparison-controls {
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+  }
+  
+  .comparison-content {
+    flex: 1;
+    position: relative;
+    background-color: #e9ecef;
+    overflow: hidden;
+  }
+  
+  .spinner-container, .error-container, .instructions {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  
+  .instructions {
+    text-align: center;
+    color: #6c757d;
+    max-width: 500px;
+    margin: 0 auto;
+    
+    p {
+      margin-bottom: 15px;
+    }
+  }

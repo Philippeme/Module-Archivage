@@ -1,0 +1,84 @@
+<div class="quick-access-panel">
+    <div class="panel-header">
+      <ul class="nav nav-tabs">
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="activeTab === 'favorites'" (click)="setActiveTab('favorites')">
+            <i class="bi bi-star-fill me-1"></i> Favoris
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="activeTab === 'recent'" (click)="setActiveTab('recent')">
+            <i class="bi bi-clock-history me-1"></i> Récents
+          </a>
+        </li>
+      </ul>
+    </div>
+    
+    <div class="panel-content">
+      <!-- Onglet Favoris -->
+      <div *ngIf="activeTab === 'favorites'">
+        <div class="list-group list-group-flush">
+          <div *ngIf="favoriteDocuments.length === 0" class="empty-state">
+            <i class="bi bi-star text-muted"></i>
+            <p>Aucun document favori</p>
+            <small>Ajoutez des documents aux favoris pour y accéder rapidement</small>
+          </div>
+          
+          <a *ngFor="let doc of favoriteDocuments" 
+             class="list-group-item list-group-item-action"
+             (click)="onDocumentClick(doc)">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="doc-info">
+                <i class="bi bi-file-pdf text-danger me-2"></i>
+                <span class="doc-name">{{ doc.originalName }}</span>
+              </div>
+              <button class="btn btn-sm btn-link text-danger" 
+                     (click)="removeFromFavorites(doc, $event)" 
+                     title="Retirer des favoris">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </div>
+            <div class="doc-metadata">
+              <small>{{ doc.type }} | {{ doc.lastModificationDate | date:'dd/MM/yyyy' }}</small>
+            </div>
+          </a>
+        </div>
+      </div>
+      
+      <!-- Onglet Récents -->
+      <div *ngIf="activeTab === 'recent'">
+        <div class="d-flex justify-content-between align-items-center mb-2 px-3 pt-2">
+          <h6 class="mb-0">Documents récents</h6>
+          <button *ngIf="recentDocuments.length > 0" 
+                  class="btn btn-sm btn-link" 
+                  (click)="clearRecentDocuments()" 
+                  title="Effacer l'historique">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+        
+        <div class="list-group list-group-flush">
+          <div *ngIf="recentDocuments.length === 0" class="empty-state">
+            <i class="bi bi-clock text-muted"></i>
+            <p>Aucun document récent</p>
+            <small>Les documents consultés apparaîtront ici</small>
+          </div>
+          
+          <a *ngFor="let doc of recentDocuments" 
+             class="list-group-item list-group-item-action"
+             (click)="onDocumentClick(doc)">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="doc-info">
+                <i class="bi bi-file-pdf text-danger me-2"></i>
+                <span class="doc-name">{{ doc.originalName }}</span>
+              </div>
+              <small class="text-muted">{{ doc.lastModificationDate | date:'dd/MM/yyyy' }}</small>
+            </div>
+            <div class="doc-metadata">
+              <small>{{ doc.type }}</small>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>

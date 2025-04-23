@@ -1,0 +1,99 @@
+<div class="email-share-modal-overlay">
+    <div class="email-share-modal-container">
+      <div class="email-share-modal-header">
+        <h5 class="mb-0">Partager par email</h5>
+        <button type="button" class="btn-close" aria-label="Fermer" (click)="closeModal()"></button>
+      </div>
+      
+      <div class="email-share-modal-body">
+        <div *ngIf="errorMessage" class="alert alert-danger">
+          {{ errorMessage }}
+        </div>
+        
+        <form [formGroup]="shareForm" (ngSubmit)="shareDocument()">
+          <div class="document-info mb-3">
+            <div class="document-title">
+              <i class="bi bi-file-pdf text-danger me-2"></i>
+              <span>{{ document?.originalName }}</span>
+            </div>
+            <div class="document-meta">
+              <small>{{ document?.type }} | {{ document?.size | number }} Ko</small>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="recipientEmail" class="form-label">Adresse email du destinataire *</label>
+            <input 
+              type="email" 
+              class="form-control" 
+              id="recipientEmail" 
+              formControlName="recipientEmail"
+              placeholder="exemple@domaine.com"
+              [ngClass]="{'is-invalid': shareForm.get('recipientEmail')?.invalid && shareForm.get('recipientEmail')?.touched}"
+            >
+            <div class="invalid-feedback" *ngIf="shareForm.get('recipientEmail')?.errors?.['required']">
+              L'adresse email est requise
+            </div>
+            <div class="invalid-feedback" *ngIf="shareForm.get('recipientEmail')?.errors?.['email']">
+              Veuillez saisir une adresse email valide
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="subject" class="form-label">Sujet *</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="subject" 
+              formControlName="subject"
+              [ngClass]="{'is-invalid': shareForm.get('subject')?.invalid && shareForm.get('subject')?.touched}"
+            >
+            <div class="invalid-feedback" *ngIf="shareForm.get('subject')?.errors?.['required']">
+              Le sujet est requis
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="message" class="form-label">Message *</label>
+            <textarea 
+              class="form-control" 
+              id="message" 
+              formControlName="message"
+              rows="4"
+              [ngClass]="{'is-invalid': shareForm.get('message')?.invalid && shareForm.get('message')?.touched}"
+            ></textarea>
+            <div class="invalid-feedback" *ngIf="shareForm.get('message')?.errors?.['required']">
+              Le message est requis
+            </div>
+          </div>
+          
+          <div class="mb-3 form-check">
+            <input 
+              type="checkbox" 
+              class="form-check-input" 
+              id="includePreview" 
+              formControlName="includePreview"
+            >
+            <label class="form-check-label" for="includePreview">
+              Inclure une prévisualisation du document
+            </label>
+            <small class="form-text text-muted d-block">
+              Si désactivé, seul un lien sécurisé vers le document sera inclus
+            </small>
+          </div>
+          
+          <div class="d-flex justify-content-end mt-4">
+            <button type="button" class="btn btn-secondary me-2" (click)="closeModal()">Annuler</button>
+            <button 
+              type="submit" 
+              class="btn btn-primary" 
+              [disabled]="isLoading"
+            >
+              <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-1"></span>
+              Partager
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>

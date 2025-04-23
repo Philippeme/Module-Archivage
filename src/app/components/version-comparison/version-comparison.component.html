@@ -1,0 +1,65 @@
+<div class="comparison-overlay">
+    <div class="comparison-container">
+      <div class="comparison-header">
+        <h5 class="mb-0">Comparaison des versions</h5>
+        <button class="btn btn-sm btn-outline-secondary" (click)="closeComparison()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      
+      <div class="comparison-controls">
+        <div class="row align-items-center">
+          <div class="col-md-4">
+            <div class="form-group">
+              <label for="version1" class="form-label">Version 1:</label>
+              <select id="version1" class="form-select form-select-sm" [(ngModel)]="selectedVersion1">
+                <option *ngFor="let version of documentVersions" [ngValue]="version">
+                  Version {{ version.version }} ({{ version.lastModificationDate | date:'dd/MM/yyyy' }})
+                </option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="col-md-4">
+            <div class="form-group">
+              <label for="version2" class="form-label">Version 2:</label>
+              <select id="version2" class="form-select form-select-sm" [(ngModel)]="selectedVersion2">
+                <option *ngFor="let version of documentVersions" [ngValue]="version">
+                  Version {{ version.version }} ({{ version.lastModificationDate | date:'dd/MM/yyyy' }})
+                </option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="col-md-4 text-end">
+            <button class="btn btn-primary" [disabled]="!selectedVersion1 || !selectedVersion2 || isLoading" (click)="compareVersions()">
+              <i class="bi bi-arrow-left-right me-1"></i>
+              Comparer
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="comparison-content">
+        <div class="spinner-container" *ngIf="isLoading">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+          </div>
+        </div>
+        
+        <div class="error-container" *ngIf="errorMessage">
+          <div class="alert alert-danger">
+            {{ errorMessage }}
+          </div>
+        </div>
+        
+        <div class="instructions" *ngIf="!comparisonPdfUrl && !isLoading && !errorMessage">
+          <p>Sélectionnez deux versions du document à comparer et cliquez sur le bouton "Comparer".</p>
+          <p>Le système mettra en évidence les différences entre les deux versions sélectionnées.</p>
+        </div>
+        
+        <iframe *ngIf="comparisonPdfUrl && !isLoading && !errorMessage" [src]="comparisonPdfUrl" frameborder="0" width="100%" height="100%">
+        </iframe>
+      </div>
+    </div>
+  </div>

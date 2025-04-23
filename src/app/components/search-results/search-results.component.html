@@ -1,0 +1,100 @@
+<div class="search-results-container">
+    <!-- État de chargement -->
+    <div class="loading-overlay" *ngIf="isLoading">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Chargement...</span>
+      </div>
+    </div>
+    
+    <!-- Message d'erreur -->
+    <div class="alert alert-danger" *ngIf="error">
+      {{ error }}
+    </div>
+    
+    <!-- En-tête des résultats -->
+    <div class="results-header" *ngIf="!isLoading && !error">
+      <div class="results-count">
+        <strong>{{ resultsCount }}</strong> documents trouvés
+        <span *ngIf="searchTerm"> pour "<strong>{{ searchTerm }}</strong>"</span>
+      </div>
+      
+      <div class="results-actions">
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-sm" [class.btn-primary]="groupBy === 'none'" [class.btn-outline-primary]="groupBy !== 'none'" (click)="setGroupBy('none')">
+            <i class="bi bi-list"></i> Plat
+          </button>
+          <button type="button" class="btn btn-sm" [class.btn-primary]="groupBy === 'type'" [class.btn-outline-primary]="groupBy !== 'type'" (click)="setGroupBy('type')">
+            <i class="bi bi-files"></i> Par type
+          </button>
+          <button type="button" class="btn btn-sm" [class.btn-primary]="groupBy === 'institution'" [class.btn-outline-primary]="groupBy !== 'institution'" (click)="setGroupBy('institution')">
+            <i class="bi bi-building"></i> Par institution
+          </button>
+          <button type="button" class="btn btn-sm" [class.btn-primary]="groupBy === 'date'" [class.btn-outline-primary]="groupBy !== 'date'" (click)="setGroupBy('date')">
+            <i class="bi bi-calendar"></i> Par année
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Message si aucun résultat -->
+    <div class="no-results" *ngIf="resultsCount === 0 && !isLoading && !error">
+      <i class="bi bi-search"></i>
+      <p>Aucun document ne correspond à votre recherche.</p>
+      <ul>
+        <li>Vérifiez l'orthographe des termes de recherche.</li>
+        <li>Essayez des termes plus généraux.</li>
+        <li>Réduisez le nombre de critères de filtre.</li>
+      </ul>
+    </div>
+    
+    <!-- Liste des résultats groupés -->
+    <div class="results-groups" *ngIf="resultsCount > 0 && !isLoading && !error">
+      <div *ngFor="let group of groupedResults | keyvalue" class="results-group">
+        <div class="group-header">
+          <h5>{{ group.key }} <span class="badge bg-secondary">{{ group.value.length }}</span></h5>
+        </div>
+        
+        <div class="group-content">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Institution source</th>
+                  <th>Date de création</th>
+                  <th>Personne concernée</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let document of group.value">
+                  <td>
+                    <div class="document-name">
+                      <i class="bi bi-file-pdf text-danger me-2"></i>
+                      {{ document.originalName }}
+                    </div>
+                  </td>
+                  <td>{{ document.sourceInstitution }}</td>
+                  <td>{{ document.creationDate | date:'dd/MM/yyyy' }}</td>
+                  <td>
+                    {{ document.concernedPerson1 }}
+                    <span *ngIf="document.concernedPerson2"><br>{{ document.concernedPerson2 }}</span>
+                  </td>
+                  <td>
+                    <div class="btn-group">
+                      <button class="btn btn-sm btn-outline-primary" title="Prévisualiser">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-success" title="Télécharger">
+                        <i class="bi bi-download"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -72,5 +72,6 @@ export interface DocumentComment {
     VIEW = 'Consultation',
     DOWNLOAD = 'Téléchargement',
     SHARE = 'Partage',
-    VERSION_CREATE = 'Création de version'
+    VERSION_CREATE = 'Création de version',
+    COMMENT_ADD = 'Ajout de commentaire'
   }

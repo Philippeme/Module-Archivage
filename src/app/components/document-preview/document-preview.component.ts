@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
-import { Document } from '../../models/document.model';
+import { Document, ActionType } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
+import { FavoritesService } from '../../services/favorites.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 @Component({
@@ -11,15 +12,22 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 export class DocumentPreviewComponent implements OnChanges {
   @Input() document: Document | null = null;
   @Output() close = new EventEmitter<void>();
-  
+
   documentVersions: Document[] = [];
   selectedVersion: Document | null = null;
   pdfUrl: SafeResourceUrl | null = null;
   isLoading = false;
   errorMessage = '';
-  
+
+  activeTab: 'info' | 'comments' | 'history' = 'info';
+  showComparisonView = false;
+  isPreviewMode = true; // Pour basculer entre prévisualisation et document complet
+  showShareModal = false;
+  shareSuccess = '';
+
   constructor(
     private documentService: DocumentService,
+    private favoritesService: FavoritesService,
     private sanitizer: DomSanitizer
   ) { }
 
@@ -28,12 +36,21 @@ export class DocumentPreviewComponent implements OnChanges {
       this.selectedVersion = this.document;
       this.loadDocumentVersions();
       this.loadDocumentContent();
+
+      // Charger en mode prévisualisation d'abord
+      this.loadDocumentPreview();
+
+      // Ajouter aux documents récents
+      this.favoritesService.addToRecentDocuments(this.document);
+
+      // Enregistrer l'action de consultation
+      this.documentService.recordDocumentAction(this.document.id, ActionType.VIEW).subscribe();
     }
   }
 
   loadDocumentVersions(): void {
     if (!this.document) return;
-    
+
     this.isLoading = true;
     this.documentService.getDocumentVersions(this.document.id).subscribe({
       next: (versions) => {
@@ -48,13 +65,41 @@ export class DocumentPreviewComponent implements OnChanges {
     });
   }
 
-  loadDocumentContent(): void {
+  loadDocumentPreview(): void {
     if (!this.selectedVersion) return;
-    
+
     this.isLoading = true;
     this.pdfUrl = null;
     this.errorMessage = '';
-    
+
+    // Utiliser la prévisualisation légère ou le document complet selon le mode
+    const loadMethod = this.isPreviewMode
+      ? this.documentService.getDocumentPreview(this.selectedVersion.id)
+      : this.documentService.downloadDocument(this.selectedVersion.id);
+
+    loadMethod.subscribe({
+      next: (blob) => {
+        // Créer une URL pour le PDF
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(objectUrl);
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading document content', error);
+        this.errorMessage = 'Erreur lors du chargement du contenu du document.';
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadDocumentContent(): void {
+    if (!this.selectedVersion) return;
+
+    this.isLoading = true;
+    this.pdfUrl = null;
+    this.errorMessage = '';
+
     this.documentService.downloadDocument(this.selectedVersion.id).subscribe({
       next: (blob) => {
         // Créer une URL pour le PDF
@@ -71,9 +116,18 @@ export class DocumentPreviewComponent implements OnChanges {
     });
   }
 
+  toggleViewMode(): void {
+    this.isPreviewMode = !this.isPreviewMode;
+
+    // Recharger le document dans le nouveau mode
+    if (this.selectedVersion) {
+      this.loadDocumentPreview();
+    }
+  }
+
   selectVersion(version: Document): void {
     this.selectedVersion = version;
-    this.loadDocumentContent();
+    this.loadDocumentPreview();
   }
 
   closePreview(): void {
@@ -84,19 +138,52 @@ export class DocumentPreviewComponent implements OnChanges {
     this.close.emit();
   }
 
+  isFavorite(): boolean {
+    if (!this.selectedVersion) return false;
+    return this.favoritesService.isFavorite(this.selectedVersion.id);
+  }
+
+  toggleFavorite(): void {
+    if (!this.selectedVersion) return;
+
+    if (this.isFavorite()) {
+      this.favoritesService.removeFromFavorites(this.selectedVersion.id);
+    } else {
+      this.favoritesService.addToFavorites(this.selectedVersion);
+    }
+  }
+
+  setActiveTab(tab: 'info' | 'comments' | 'history'): void {
+    this.activeTab = tab;
+  }
+
+  openVersionComparison(): void {
+    this.showComparisonView = true;
+  }
+
+  closeVersionComparison(): void {
+    this.showComparisonView = false;
+  }
+
   downloadCurrentDocument(): void {
     if (!this.selectedVersion) return;
-    
-    this.documentService.downloadDocument(this.selectedVersion.id).subscribe({
+
+    // Créer une référence locale que TypeScript sait ne pas être null
+    const version = this.selectedVersion;
+
+    this.documentService.downloadDocument(version.id).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = this.selectedVersion?.originalName || 'document.pdf';
+        a.download = version.originalName || 'document.pdf';
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         a.remove();
+
+        // Utiliser la référence locale ici
+        this.documentService.recordDocumentAction(version.id, ActionType.DOWNLOAD).subscribe();
       },
       error: (error) => {
         console.error('Error downloading document', error);
@@ -107,29 +194,30 @@ export class DocumentPreviewComponent implements OnChanges {
 
   shareCurrentDocument(): void {
     if (!this.selectedVersion) return;
-    
-    const email = prompt('Veuillez entrer l\'adresse email du destinataire :');
-    
-    if (email) {
-      // Validation simple de l'email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        alert('Veuillez entrer une adresse email valide.');
-        return;
-      }
-      
-      this.isLoading = true;
-      this.documentService.shareDocumentByEmail(this.selectedVersion.id, email).subscribe({
-        next: (success) => {
-          alert(`Document partagé avec succès à ${email}`);
-          this.isLoading = false;
-        },
-        error: (error) => {
-          console.error('Error sharing document', error);
-          alert('Erreur lors du partage du document. Veuillez réessayer plus tard.');
-          this.isLoading = false;
-        }
-      });
+    this.showShareModal = true;
+  }
+
+  // Ajouter une nouvelle méthode pour gérer la fermeture du modal
+  closeShareModal(): void {
+    this.showShareModal = false;
+  }
+
+  // Ajouter une nouvelle méthode pour gérer le succès du partage
+  handleShareSuccess(email: string): void {
+    this.shareSuccess = `Document partagé avec succès à ${email}`;
+
+    // Enregistrer l'action de partage
+    if (this.selectedVersion) {
+      this.documentService.recordDocumentAction(
+        this.selectedVersion.id,
+        ActionType.SHARE,
+        `Partagé avec ${email}`
+      ).subscribe();
     }
+
+    // Cacher le message après 5 secondes
+    setTimeout(() => {
+      this.shareSuccess = '';
+    }, 5000);
   }
 }

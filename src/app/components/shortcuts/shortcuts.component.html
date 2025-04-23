@@ -1,0 +1,26 @@
+<div class="shortcuts-container">
+    <h5 class="shortcuts-title">
+      <i class="bi bi-lightning-charge-fill me-2"></i>
+      Accès rapide
+    </h5>
+    
+    <div *ngIf="isLoading" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary" role="status">
+        <span class="visually-hidden">Chargement...</span>
+      </div>
+    </div>
+    
+    <div *ngFor="let section of getQuickFolders()" class="shortcut-section">
+      <h6 class="section-title">{{ section.title }}</h6>
+      <div class="shortcut-grid">
+        <div *ngFor="let folder of section.folders" 
+             class="shortcut-card" 
+             (click)="navigateToFolder(folder)">
+          <div class="shortcut-icon">
+            <i class="bi" [ngClass]="folder.iconClass || 'bi-folder-fill'" [class]="folder.colorClass || 'text-warning'"></i>
+          </div>
+          <div class="shortcut-name">{{ folder.name }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
