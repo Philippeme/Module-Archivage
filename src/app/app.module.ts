@@ -27,6 +27,9 @@ import { SearchBarComponent } from './components/search-bar/search-bar.component
 import { SearchResultsComponent } from './components/search-results/search-results.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 
+// Import du nouveau service
+import { DatabaseService } from './services/database.service';
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -63,7 +66,8 @@ import { AuthInterceptor } from './interceptors/auth.interceptor';
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptor,
       multi: true
-    }
+    },
+    DatabaseService // Ajout du service DatabaseService
   ],
   bootstrap: [AppComponent]
 })

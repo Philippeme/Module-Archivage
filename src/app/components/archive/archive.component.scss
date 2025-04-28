@@ -102,3 +102,72 @@
 .text-teal {
     color: #20c997;
 }
+
+.location-controls {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.location-controls .form-select {
+    font-size: 0.875rem;
+}
+
+.location-controls label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 2px;
+}
+
+/* Styles pour les vues liste et grille d'icônes */
+.document-list .folder-row {
+    cursor: pointer;
+}
+
+.document-list .document-row td {
+    cursor: default;
+}
+
+.document-list .document-row td:first-child {
+    cursor: pointer;
+}
+
+.document-grid .grid-item {
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.document-grid .grid-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.document-grid .item-actions {
+    display: none;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+.document-grid .grid-item:hover .item-actions {
+    display: flex;
+}
+
+/* Styles pour les résultats de recherche */
+.search-results {
+    margin-bottom: 20px;
+}
+
+.search-header {
+    margin-bottom: 20px;
+}
+
+.search-header h4 {
+    margin-bottom: 5px;
+}
+
+.search-header p {
+    color: #6c757d;
+    margin-bottom: 0;
+}

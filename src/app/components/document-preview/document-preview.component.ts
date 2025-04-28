@@ -35,8 +35,7 @@ export class DocumentPreviewComponent implements OnChanges {
     if (changes['document'] && this.document) {
       this.selectedVersion = this.document;
       this.loadDocumentVersions();
-      this.loadDocumentContent();
-
+      
       // Charger en mode prévisualisation d'abord
       this.loadDocumentPreview();
 
@@ -78,29 +77,6 @@ export class DocumentPreviewComponent implements OnChanges {
       : this.documentService.downloadDocument(this.selectedVersion.id);
 
     loadMethod.subscribe({
-      next: (blob) => {
-        // Créer une URL pour le PDF
-        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-        const objectUrl = URL.createObjectURL(pdfBlob);
-        this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(objectUrl);
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading document content', error);
-        this.errorMessage = 'Erreur lors du chargement du contenu du document.';
-        this.isLoading = false;
-      }
-    });
-  }
-
-  loadDocumentContent(): void {
-    if (!this.selectedVersion) return;
-
-    this.isLoading = true;
-    this.pdfUrl = null;
-    this.errorMessage = '';
-
-    this.documentService.downloadDocument(this.selectedVersion.id).subscribe({
       next: (blob) => {
         // Créer une URL pour le PDF
         const pdfBlob = new Blob([blob], { type: 'application/pdf' });
@@ -197,12 +173,10 @@ export class DocumentPreviewComponent implements OnChanges {
     this.showShareModal = true;
   }
 
-  // Ajouter une nouvelle méthode pour gérer la fermeture du modal
   closeShareModal(): void {
     this.showShareModal = false;
   }
 
-  // Ajouter une nouvelle méthode pour gérer le succès du partage
   handleShareSuccess(email: string): void {
     this.shareSuccess = `Document partagé avec succès à ${email}`;
 

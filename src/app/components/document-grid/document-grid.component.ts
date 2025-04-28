@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Document, Folder } from '../../models/document.model';
+import { DocumentService } from '../../services/document.service';
 
 @Component({
   selector: 'app-document-grid',
@@ -12,6 +13,8 @@ export class DocumentGridComponent {
   @Output() folderSelected = new EventEmitter<Folder>();
   @Output() folderContextMenu = new EventEmitter<Folder>();
   @Output() documentSelected = new EventEmitter<Document>();
+
+  constructor(private documentService: DocumentService) { }
 
   onFolderClick(folder: Folder): void {
     this.folderSelected.emit(folder);
@@ -98,10 +101,24 @@ export class DocumentGridComponent {
     this.documentSelected.emit(document);
   }
 
-  downloadDocument(document: Document, event: Event): void {
+  downloadDocument(doc: Document, event: Event): void {
     event.stopPropagation();
-    // Implémentation du téléchargement
-    console.log('Téléchargement de', document.originalName);
+    this.documentService.downloadDocument(doc.id).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.originalName;
+        document.body.appendChild(link);
+        link.click();
+        window.URL.revokeObjectURL(url);
+        link.remove();
+      },
+      error: (error: any) => {
+        console.error('Erreur lors du téléchargement', error);
+        alert('Erreur lors du téléchargement du document.');
+      }
+    });
   }
 
   openDocument(document: Document, event: Event): void {
@@ -109,9 +126,27 @@ export class DocumentGridComponent {
     this.documentSelected.emit(document);
   }
 
-  shareDocument(document: Document, event: Event): void {
+  shareDocument(doc: Document, event: Event): void {
     event.stopPropagation();
-    // Implémentation du partage par email
-    console.log('Partage de', document.originalName);
+    const email = prompt('Veuillez entrer l\'adresse email du destinataire :');
+
+    if (email) {
+      // Validation simple de l'email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        alert('Veuillez entrer une adresse email valide.');
+        return;
+      }
+
+      this.documentService.shareDocumentByEmail(doc.id, email).subscribe({
+        next: () => {
+          alert(`Document partagé avec succès à ${email}`);
+        },
+        error: (error: any) => {
+          console.error('Erreur lors du partage', error);
+          alert('Erreur lors du partage du document.');
+        }
+      });
+    }
   }
 }

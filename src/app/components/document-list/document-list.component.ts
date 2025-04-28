@@ -14,7 +14,6 @@ export class DocumentListComponent {
   @Output() folderContextMenu = new EventEmitter<Folder>();
   @Output() documentSelected = new EventEmitter<Document>();
 
-  // Ajouter le service dans le constructeur
   constructor(private documentService: DocumentService) { }
 
   onFolderClick(folder: Folder): void {

@@ -1,13 +1,15 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Document, Folder } from '../../models/document.model';
-import { DocumentService } from '../../services/document.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
-import { FilterCriteria } from '../../models/filter.model';
-import { FilterService } from '../../services/filter.service';
 import { Subject, takeUntil } from 'rxjs';
+
+import { Document, Folder, DocumentType } from '../../models/document.model';
+import { FilterCriteria } from '../../models/filter.model';
+import { DocumentService } from '../../services/document.service';
+import { FilterService } from '../../services/filter.service';
 import { PermissionService } from '../../services/permission.service';
 import { PermissionType } from '../../models/permission.model';
+import { DatabaseService } from '../../services/database.service';
 
 @Component({
   selector: 'app-archive',
@@ -29,12 +31,26 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   errorMessage = '';
   navigationHistory: string[] = ['/Archives'];
   historyIndex = 0;
-  
-  // Nouvelles propriétés pour la recherche et le filtrage
+
+  // Propriétés pour la recherche et le filtrage
   isSearchMode = false;
   searchTerm = '';
   currentFilter: FilterCriteria | null = null;
-  
+
+  // Propriétés pour la navigation géographique
+  documentTypes = Object.values(DocumentType);
+  availableRegions: any[] = [];
+  selectedRegion: any = null;
+  availableCercles: any[] = [];
+  selectedCercle: any = null;
+  availableCommunes: any[] = [];
+  selectedCommune: any = null;
+  availableCentresEtatCivil: any[] = [];
+  selectedCentre: any = null;
+  availableCentresDeclaration: any[] = [];
+  availableTribunaux: any[] = [];
+  selectedTribunal: any = null;
+
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -43,7 +59,8 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private location: Location,
     private filterService: FilterService,
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    private databaseService: DatabaseService
   ) { }
 
   ngOnInit(): void {
@@ -55,7 +72,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(filter => {
       this.currentFilter = filter?.criteria || null;
-      
+
       // Si nous sommes en mode recherche, mettre à jour les résultats
       if (this.isSearchMode) {
         this.applyFilters(this.currentFilter || {});
@@ -74,7 +91,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       if (params['mode']) {
         this.navigationMode = params['mode'] as 'time' | 'location';
       }
-      
+
       if (params['search']) {
         this.searchTerm = params['search'];
         this.isSearchMode = true;
@@ -83,6 +100,9 @@ export class ArchiveComponent implements OnInit, OnDestroy {
         this.loadFolderContent();
       }
     });
+
+    // Charger les régions disponibles
+    this.loadRegions();
   }
 
   ngOnDestroy(): void {
@@ -101,7 +121,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     if (storedNavigationMode) {
       this.navigationMode = storedNavigationMode as 'time' | 'location';
     }
-    
+
     const storedSidebarMode = localStorage.getItem('archiveSidebarMode');
     if (storedSidebarMode) {
       this.sidebarMode = storedSidebarMode as 'tree' | 'quick';
@@ -115,6 +135,145 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     localStorage.setItem('archiveSidebarMode', this.sidebarMode);
   }
 
+  loadRegions(): void {
+    this.databaseService.getRegions().subscribe({
+      next: (regions) => {
+        this.availableRegions = regions;
+      },
+      error: (error) => {
+        console.error('Error loading regions', error);
+      }
+    });
+  }
+
+  onRegionChange(regionId: number): void {
+    this.selectedRegion = this.availableRegions.find(r => r.id === regionId);
+    this.selectedCercle = null;
+    this.selectedCommune = null;
+    this.availableCommunes = [];
+    this.selectedCentre = null;
+    this.selectedTribunal = null;
+    this.availableCentresEtatCivil = [];
+    this.availableCentresDeclaration = [];
+    this.availableTribunaux = [];
+
+    this.databaseService.getCerclesByRegion(regionId).subscribe({
+      next: (cercles) => {
+        this.availableCercles = cercles;
+      },
+      error: (error) => {
+        console.error('Error loading cercles', error);
+      }
+    });
+
+    // Mettre à jour la navigation
+    if (this.navigationMode === 'location') {
+      const path = `/Archives/${this.getSelectedDocumentType()}/${this.selectedRegion.nom}/`;
+      this.navigateToPath(path);
+    }
+  }
+
+  onCercleChange(cercleId: number): void {
+    this.selectedCercle = this.availableCercles.find(c => c.id === cercleId);
+    this.selectedCommune = null;
+    this.selectedCentre = null;
+    this.selectedTribunal = null;
+    this.availableCentresEtatCivil = [];
+    this.availableCentresDeclaration = [];
+    this.availableTribunaux = [];
+
+    this.databaseService.getCommunesByCercle(cercleId).subscribe({
+      next: (communes) => {
+        this.availableCommunes = communes;
+      },
+      error: (error) => {
+        console.error('Error loading communes', error);
+      }
+    });
+
+    // Mettre à jour la navigation
+    if (this.navigationMode === 'location' && this.selectedRegion) {
+      const path = `/Archives/${this.getSelectedDocumentType()}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/`;
+      this.navigateToPath(path);
+    }
+  }
+
+  onCommuneChange(communeId: number): void {
+    this.selectedCommune = this.availableCommunes.find(c => c.id === communeId);
+    this.selectedCentre = null;
+    this.selectedTribunal = null;
+
+    // Charger les centres d'état civil pour cette commune
+    this.databaseService.getCentresEtatCivilByCommune(communeId).subscribe({
+      next: (centres) => {
+        this.availableCentresEtatCivil = centres;
+      },
+      error: (error) => {
+        console.error('Error loading centres d\'état civil', error);
+      }
+    });
+
+    // Charger les centres de déclaration pour cette commune
+    this.databaseService.getCentresDeclarationByCommune(communeId).subscribe({
+      next: (centres) => {
+        this.availableCentresDeclaration = centres;
+      },
+      error: (error) => {
+        console.error('Error loading centres de déclaration', error);
+      }
+    });
+
+    // Charger les tribunaux pour cette commune
+    this.databaseService.getTribunauxByCommune(communeId).subscribe({
+      next: (tribunaux) => {
+        this.availableTribunaux = tribunaux;
+      },
+      error: (error) => {
+        console.error('Error loading tribunaux', error);
+      }
+    });
+
+    // Mettre à jour la navigation
+    if (this.navigationMode === 'location' && this.selectedRegion && this.selectedCercle) {
+      const path = `/Archives/${this.getSelectedDocumentType()}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/${this.selectedCommune.nom}/`;
+      this.navigateToPath(path);
+    }
+  }
+
+  onCentreChange(centreId: number, type: 'etatCivil' | 'declaration'): void {
+    if (type === 'etatCivil') {
+      this.selectedCentre = this.availableCentresEtatCivil.find(c => c.id === centreId);
+    } else {
+      this.selectedCentre = this.availableCentresDeclaration.find(c => c.id === centreId);
+    }
+
+    // Mettre à jour la navigation
+    if (this.navigationMode === 'location' && this.selectedRegion && this.selectedCercle && this.selectedCommune) {
+      const institutionType = type === 'etatCivil' ? 'Centre d\'état civil' : 'Centre de déclaration';
+      const path = `/Archives/${this.getSelectedDocumentType()}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/${this.selectedCommune.nom}/${institutionType}/${this.selectedCentre.nom}/`;
+      this.navigateToPath(path);
+    }
+  }
+
+  onTribunalChange(tribunalId: number): void {
+    this.selectedTribunal = this.availableTribunaux.find(t => t.id === tribunalId);
+
+    // Mettre à jour la navigation
+    if (this.navigationMode === 'location' && this.selectedRegion && this.selectedCercle && this.selectedCommune) {
+      const path = `/Archives/${this.getSelectedDocumentType()}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/${this.selectedCommune.nom}/Tribunal/${this.selectedTribunal.nom}/`;
+      this.navigateToPath(path);
+    }
+  }
+
+  getSelectedDocumentType(): string {
+    // Extraire le type de document du chemin actuel
+    const pathParts = this.currentPath.split('/').filter(part => part !== '');
+    if (pathParts.length > 1) {
+      return pathParts[1];
+    }
+    return '';
+  }
+
   loadFolderContent(): void {
     this.isLoading = true;
     this.errorMessage = '';
@@ -123,44 +282,306 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     const cleanedPath = this.cleanupPath(this.currentPath);
     this.currentPath = cleanedPath;
 
-    // Charger les dossiers selon le mode de navigation
-    this.documentService.loadFolders(cleanedPath, this.navigationMode).subscribe({
-      next: (folders) => {
-        this.currentFolders = folders.map(folder => ({
-          ...folder,
-          iconClass: this.documentService.getFolderIcon(folder),
-          colorClass: this.documentService.getFolderColor(folder)
-        }));
+    // Analyser le chemin pour déterminer quels éléments doivent être chargés
+    const pathParts = cleanedPath.split('/').filter(part => part !== '');
 
-        // Charger les documents du dossier actuel
-        this.loadDocuments();
+    // Si nous sommes à la racine
+    if (pathParts.length <= 1) {
+      // Afficher les types de documents (racine)
+      this.documentService.getRootFolders().subscribe({
+        next: (folders) => {
+          this.currentFolders = folders;
+          this.currentDocuments = [];
+          this.isLoading = false;
+        },
+        error: (error) => {
+          console.error('Error loading root folders', error);
+          this.errorMessage = `Erreur lors du chargement des dossiers: ${error.message}`;
+          this.isLoading = false;
+        }
+      });
+      return;
+    }
+
+    // Récupérer le type de document (premier élément après "Archives")
+    const documentType = pathParts[1];
+
+    if (this.navigationMode === 'time') {
+      // Navigation par temps
+      if (pathParts.length === 2) {
+        // Niveau des années
+        this.loadYearFolders(documentType);
+      } else if (pathParts.length === 3) {
+        // Niveau des mois
+        this.loadMonthFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+      } else if (pathParts.length === 4) {
+        // Niveau des jours
+        this.loadDayFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+      } else if (pathParts.length === 5) {
+        // Niveau des documents pour un jour spécifique
+        this.loadDocumentsByPath(cleanedPath);
+      }
+    } else {
+      // Navigation par lieu
+      if (pathParts.length === 2) {
+        // Niveau des régions
+        this.loadRegionFolders(documentType);
+      } else if (pathParts.length === 3) {
+        // Niveau des cercles pour une région
+        this.loadCircleFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+      } else if (pathParts.length === 4) {
+        // Niveau des communes pour un cercle
+        this.loadCommuneFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+      } else if (pathParts.length === 5) {
+        // Niveau des centres pour une commune
+        this.loadCentreFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/`);
+      } else if (pathParts.length >= 6) {
+        // Niveau des documents pour un centre spécifique
+        this.loadDocumentsByPath(cleanedPath);
+      }
+    }
+  }
+
+  // Méthodes spécifiques pour charger les différents niveaux de dossiers
+  loadYearFolders(documentType: string): void {
+    this.documentService.getYearFolders(documentType).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error loading folders', error);
-        this.errorMessage = `Erreur lors du chargement des dossiers: ${error.message}`;
+        console.error('Error loading year folders', error);
+        this.errorMessage = `Erreur lors du chargement des années: ${error.message}`;
         this.isLoading = false;
       }
     });
   }
 
-  loadDocuments(): void {
-    // Utiliser le filtre courant avec le chemin actuel
-    const filter: FilterCriteria = {
-      ...(this.currentFilter || {}),
-      path: this.currentPath
-    };
-    
-    this.documentService.getDocuments(filter).subscribe({
+  loadMonthFolders(yearPath: string): void {
+    this.documentService.getMonthFolders(yearPath).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading month folders', error);
+        this.errorMessage = `Erreur lors du chargement des mois: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadDayFolders(monthPath: string): void {
+    this.documentService.getDayFolders(monthPath).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading day folders', error);
+        this.errorMessage = `Erreur lors du chargement des jours: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadRegionFolders(documentType: string): void {
+    this.documentService.getRegionFolders(documentType).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
+
+        // Mettre à jour les sélections si nécessaire
+        this.updateLocationSelections();
+      },
+      error: (error) => {
+        console.error('Error loading region folders', error);
+        this.errorMessage = `Erreur lors du chargement des régions: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadCircleFolders(regionPath: string): void {
+    this.documentService.getCircleFolders(regionPath).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
+
+        // Mettre à jour les sélections si nécessaire
+        this.updateLocationSelections();
+      },
+      error: (error) => {
+        console.error('Error loading circle folders', error);
+        this.errorMessage = `Erreur lors du chargement des cercles: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadCommuneFolders(circlePath: string): void {
+    this.documentService.getCommuneFolders(circlePath).subscribe({
+      next: (folders) => {
+        this.currentFolders = folders;
+        this.currentDocuments = [];
+        this.isLoading = false;
+
+        // Mettre à jour les sélections si nécessaire
+        this.updateLocationSelections();
+      },
+      error: (error) => {
+        console.error('Error loading commune folders', error);
+        this.errorMessage = `Erreur lors du chargement des communes: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadCentreFolders(communePath: string): void {
+    // Détermine quel type de centre ajouter au chemin
+    const centreType = 'Centre d\'état civil';
+
+    this.documentService.getCivilStatusCenterFolders(`${communePath}${centreType}/`).subscribe({
+      next: (folders) => {
+        // Ajouter les centres de déclaration et tribunaux
+        this.documentService.getDeclarationCenterFolders(`${communePath}Centre de déclaration/`).subscribe(declarationCenters => {
+          this.documentService.getTribunalFolders(`${communePath}Tribunal/`).subscribe(tribunals => {
+            // Combiner tous les dossiers
+            const allFolders: Folder[] = [
+              // Dossier pour les centres d'état civil
+              {
+                name: 'Centre d\'état civil',
+                path: `${communePath}Centre d\'état civil/`,
+                type: 'center',
+                iconClass: 'bi-house-door',
+                colorClass: 'text-teal'
+              },
+              // Dossier pour les centres de déclaration
+              {
+                name: 'Centre de déclaration',
+                path: `${communePath}Centre de déclaration/`,
+                type: 'center',
+                iconClass: 'bi-building-check',
+                colorClass: 'text-info'
+              },
+              // Dossier pour les tribunaux
+              {
+                name: 'Tribunal',
+                path: `${communePath}Tribunal/`,
+                type: 'center',
+                iconClass: 'bi-bank',
+                colorClass: 'text-secondary'
+              }
+            ];
+
+            this.currentFolders = allFolders;
+            this.currentDocuments = [];
+            this.isLoading = false;
+
+            // Mettre à jour les sélections si nécessaire
+            this.updateLocationSelections();
+          });
+        });
+      },
+      error: (error) => {
+        console.error('Error loading centre folders', error);
+        this.errorMessage = `Erreur lors du chargement des centres: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadDocumentsByPath(path: string): void {
+    this.documentService.getDocumentsByPath(path).subscribe({
       next: (documents) => {
+        this.currentFolders = [];
         this.currentDocuments = documents;
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('Error loading documents', error);
+        console.error('Error loading documents by path', error);
         this.errorMessage = `Erreur lors du chargement des documents: ${error.message}`;
         this.isLoading = false;
       }
     });
+  }
+
+  // Mise à jour des sélections géographiques en fonction du chemin
+  updateLocationSelections(): void {
+    // Si nous sommes en mode de navigation par lieu
+    if (this.navigationMode === 'location') {
+      const pathParts = this.currentPath.split('/').filter(part => part !== '');
+
+      // Niveau des régions
+      if (pathParts.length >= 3 && pathParts[2]) {
+        const regionName = pathParts[2];
+        const region = this.availableRegions.find(r => r.nom === regionName);
+        if (region && (!this.selectedRegion || this.selectedRegion.id !== region.id)) {
+          this.selectedRegion = region;
+          this.onRegionChange(region.id);
+        }
+      }
+
+      // Niveau des cercles
+      if (pathParts.length >= 4 && pathParts[3]) {
+        const cercleName = pathParts[3];
+        setTimeout(() => {
+          const cercle = this.availableCercles.find(c => c.nom === cercleName);
+          if (cercle && (!this.selectedCercle || this.selectedCercle.id !== cercle.id)) {
+            this.selectedCercle = cercle;
+            this.onCercleChange(cercle.id);
+          }
+        }, 500); // Délai pour s'assurer que les cercles sont chargés
+      }
+
+      // Niveau des communes
+      if (pathParts.length >= 5 && pathParts[4]) {
+        const communeName = pathParts[4];
+        setTimeout(() => {
+          const commune = this.availableCommunes.find(c => c.nom === communeName);
+          if (commune && (!this.selectedCommune || this.selectedCommune.id !== commune.id)) {
+            this.selectedCommune = commune;
+            this.onCommuneChange(commune.id);
+          }
+        }, 1000); // Délai pour s'assurer que les communes sont chargées
+      }
+
+      // Niveau des centres
+      if (pathParts.length >= 7 && pathParts[6]) {
+        const centreName = pathParts[6];
+        const centreType = pathParts[5];
+
+        setTimeout(() => {
+          if (centreType === 'Centre d\'état civil') {
+            const centre = this.availableCentresEtatCivil.find(c => c.nom === centreName);
+            if (centre && (!this.selectedCentre || this.selectedCentre.id !== centre.id)) {
+              this.selectedCentre = centre;
+            }
+          } else if (centreType === 'Centre de déclaration') {
+            const centre = this.availableCentresDeclaration.find(c => c.nom === centreName);
+            if (centre && (!this.selectedCentre || this.selectedCentre.id !== centre.id)) {
+              this.selectedCentre = centre;
+            }
+          } else if (centreType === 'Tribunal') {
+            const tribunal = this.availableTribunaux.find(t => t.nom === centreName);
+            if (tribunal && (!this.selectedTribunal || this.selectedTribunal.id !== tribunal.id)) {
+              this.selectedTribunal = tribunal;
+            }
+          }
+        }, 1500); // Délai pour s'assurer que les centres sont chargés
+      }
+    }
+  }
+
+  // Méthode pour nettoyer les chemins anormaux
+  private cleanupPath(path: string): string {
+    // Correction des années anormales (20241, 202411, etc.)
+    return path.replace(/\/(\d{4})\d+\//g, '/$1/');
   }
 
   openFolder(folder: Folder): void {
@@ -180,7 +601,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
           // Charger le contenu du dossier
           this.loadFolderContent();
-          
+
           // Désactiver le mode recherche
           this.isSearchMode = false;
           this.searchTerm = '';
@@ -195,23 +616,31 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     });
   }
 
+  navigateToPath(path: string): void {
+    this.currentPath = path;
+    this.updateBreadcrumb();
+    this.updateUrlParams();
+    this.addToHistory(this.currentPath);
+    this.loadFolderContent();
+  }
+
   updateBreadcrumb(): void {
     // Nettoyer le chemin actuel avant de construire le fil d'Ariane
     const cleanedPath = this.cleanupPath(this.currentPath);
     this.currentPath = cleanedPath;
-    
+
     const pathSegments = cleanedPath.split('/').filter(segment => segment !== '');
-    
+
     this.breadcrumbSegments = [
       { name: 'Archives', path: '/Archives' }
     ];
-    
+
     let currentPath = '/Archives';
-    
+
     for (let i = 0; i < pathSegments.length; i++) {
       if (pathSegments[i] !== 'Archives') {
         currentPath += `/${pathSegments[i]}`;
-        
+
         // Pour les segments numériques, vérifier s'il s'agit d'une année
         if (/^\d+$/.test(pathSegments[i]) && pathSegments[i].length === 4) {
           // C'est probablement une année
@@ -245,30 +674,24 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
   navigateToBreadcrumb(segment: { name: string; path: string }, event: Event): void {
     event.preventDefault();
-    
+
     // Nettoyer tout comportement anormal dans le chemin actuel
     const cleanPath = this.cleanupPath(segment.path);
-    
+
     // Naviguer vers le segment du fil d'Ariane
     this.currentPath = cleanPath;
     this.updateBreadcrumb();
     this.updateUrlParams();
-    
+
     // Ajouter à l'historique de navigation
     this.addToHistory(this.currentPath);
-    
+
     // Charger le contenu du dossier
     this.loadFolderContent();
-    
+
     // Désactiver le mode recherche
     this.isSearchMode = false;
     this.searchTerm = '';
-  }
-  
-  // Méthode pour nettoyer les chemins anormaux
-  private cleanupPath(path: string): string {
-    // Correction des années anormales (20241, 202411, etc.)
-    return path.replace(/\/(\d{4})\d+\//g, '/$1/');
   }
 
   setViewMode(mode: 'list' | 'grid'): void {
@@ -303,11 +726,11 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     // Charger le contenu du dossier
     this.loadFolderContent();
-    
+
     // Désactiver le mode recherche
     this.isSearchMode = false;
   }
-  
+
   setSidebarMode(mode: 'tree' | 'quick'): void {
     this.sidebarMode = mode;
     this.saveUserPreferences();
@@ -338,13 +761,13 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   addToHistory(path: string): void {
     // Supprimer tout ce qui se trouve après l'index actuel
     this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
-    
+
     // Ne pas ajouter si le chemin est identique au dernier
     if (this.navigationHistory.length > 0 &&
       this.navigationHistory[this.historyIndex] === path) {
       return;
     }
-    
+
     // Ajouter le nouveau chemin
     this.navigationHistory.push(path);
     this.historyIndex = this.navigationHistory.length - 1;
@@ -356,12 +779,12 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       this.currentPath = this.navigationHistory[this.historyIndex];
       this.updateBreadcrumb();
       this.updateUrlParams();
-      
+
       // Si nous sommes en mode recherche, revenir en mode navigation
       if (this.isSearchMode) {
         this.isSearchMode = false;
       }
-      
+
       this.loadFolderContent();
     }
   }
@@ -372,12 +795,12 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       this.currentPath = this.navigationHistory[this.historyIndex];
       this.updateBreadcrumb();
       this.updateUrlParams();
-      
+
       // Si nous sommes en mode recherche, revenir en mode navigation
       if (this.isSearchMode) {
         this.isSearchMode = false;
       }
-      
+
       this.loadFolderContent();
     }
   }
@@ -404,7 +827,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     // Ouvrir dans un nouvel onglet
     window.open(url, '_blank');
-    
+
     // Enregistrer dans l'historique de navigation local (facultatif)
     localStorage.setItem(`lastOpenedFolder_${folder.path}`, JSON.stringify({
       time: new Date().getTime(),
@@ -418,11 +841,11 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     // Limiter le nombre d'onglets à ouvrir pour éviter le blocage par le navigateur
     const maxTabs = 5;
     const foldersToOpen = folders.slice(0, maxTabs);
-    
+
     if (folders.length > maxTabs) {
       alert(`Pour des raisons de sécurité, seuls les ${maxTabs} premiers dossiers seront ouverts.`);
     }
-    
+
     // Ouvrir chaque dossier dans un nouvel onglet
     foldersToOpen.forEach(folder => {
       setTimeout(() => {
@@ -434,7 +857,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   applyFilters(filters: FilterCriteria): void {
     // Mettre à jour le filtre courant
     this.currentFilter = filters;
-    
+
     // Si nous sommes en mode navigation, appliquer les filtres aux documents actuels
     if (!this.isSearchMode) {
       this.loadDocuments();
@@ -443,19 +866,58 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       // La mise à jour du filtre déclenchera automatiquement la mise à jour des résultats
     }
   }
-  
+
+  loadDocuments(): void {
+    // Utiliser le filtre courant avec le chemin actuel
+    const filter: FilterCriteria = {
+      ...(this.currentFilter || {}),
+      path: this.currentPath
+    };
+
+    this.documentService.getDocuments(filter).subscribe({
+      next: (documents) => {
+        this.currentDocuments = documents;
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading documents', error);
+        this.errorMessage = `Erreur lors du chargement des documents: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
   onSearch(term: string): void {
     this.searchTerm = term;
-    
+
     if (term) {
       // Activer le mode recherche
       this.isSearchMode = true;
-      
+
       // Mettre à jour l'URL
       this.updateUrlParams();
-      
+
       // Ajouter à l'historique de navigation
       this.addToHistory(this.currentPath);
+
+      // Effectuer la recherche
+      const searchFilter: FilterCriteria = {
+        ...(this.currentFilter || {}),
+        searchTerm: term
+      };
+
+      this.documentService.getDocuments(searchFilter).subscribe({
+        next: (documents) => {
+          this.currentFolders = [];
+          this.currentDocuments = documents;
+          this.isLoading = false;
+        },
+        error: (error) => {
+          console.error('Error searching documents', error);
+          this.errorMessage = `Erreur lors de la recherche: ${error.message}`;
+          this.isLoading = false;
+        }
+      });
     } else {
       // Si le terme est vide, revenir en mode navigation
       this.isSearchMode = false;

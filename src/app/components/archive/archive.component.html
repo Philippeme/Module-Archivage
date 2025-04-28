@@ -97,6 +97,64 @@
             </div>
         </div>
 
+        <!-- Contrôles de navigation géographique -->
+        <div class="location-controls ms-3" *ngIf="navigationMode === 'location' && currentPath !== '/Archives'">
+            <div class="row">
+                <div class="col-md-4 mb-2">
+                    <select class="form-select form-select-sm" [ngModel]="selectedRegion?.id"
+                        (ngModelChange)="onRegionChange($event)">
+                        <option [ngValue]="null">Sélectionner une région</option>
+                        <option *ngFor="let region of availableRegions" [ngValue]="region.id">{{ region.nom }}</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <select class="form-select form-select-sm" [disabled]="!selectedRegion"
+                        [ngModel]="selectedCercle?.id" (ngModelChange)="onCercleChange($event)">
+                        <option [ngValue]="null">Sélectionner un cercle</option>
+                        <option *ngFor="let cercle of availableCercles" [ngValue]="cercle.id">{{ cercle.nom }}</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <select class="form-select form-select-sm" [disabled]="!selectedCercle"
+                        [ngModel]="selectedCommune?.id" (ngModelChange)="onCommuneChange($event)">
+                        <option [ngValue]="null">Sélectionner une commune</option>
+                        <option *ngFor="let commune of availableCommunes" [ngValue]="commune.id">{{ commune.nom }}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 mb-2"
+                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Centre d\'état civil')">
+                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
+                        [ngModel]="selectedCentre?.id" (ngModelChange)="onCentreChange($event, 'etatCivil')">
+                        <option [ngValue]="null">Sélectionner un centre d'état civil</option>
+                        <option *ngFor="let centre of availableCentresEtatCivil" [ngValue]="centre.id">{{ centre.nom }}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 mb-2"
+                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Centre de déclaration')">
+                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
+                        [ngModel]="selectedCentre?.id" (ngModelChange)="onCentreChange($event, 'declaration')">
+                        <option [ngValue]="null">Sélectionner un centre de déclaration</option>
+                        <option *ngFor="let centre of availableCentresDeclaration" [ngValue]="centre.id">{{ centre.nom
+                            }}</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 mb-2"
+                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Tribunal')">
+                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
+                        [ngModel]="selectedTribunal?.id" (ngModelChange)="onTribunalChange($event)">
+                        <option [ngValue]="null">Sélectionner un tribunal</option>
+                        <option *ngFor="let tribunal of availableTribunaux" [ngValue]="tribunal.id">{{ tribunal.nom }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <!-- Filtres avancés -->
         <app-advanced-filter (filtersChanged)="applyFilters($event)"></app-advanced-filter>
 
@@ -128,8 +186,26 @@
 
         <!-- Mode recherche -->
         <div class="content-container" *ngIf="!isLoading && isSearchMode">
-            <app-search-results [searchTerm]="searchTerm" [filter]="currentFilter">
-            </app-search-results>
+            <div class="search-results">
+                <div class="search-header">
+                    <h4>Résultats de recherche pour "{{ searchTerm }}"</h4>
+                    <p>{{ currentDocuments.length }} document(s) trouvé(s)</p>
+                </div>
+
+                <app-document-list *ngIf="viewMode === 'list'" [documents]="currentDocuments"
+                    (documentSelected)="openDocument($event)">
+                </app-document-list>
+
+                <app-document-grid *ngIf="viewMode === 'grid'" [documents]="currentDocuments"
+                    (documentSelected)="openDocument($event)">
+                </app-document-grid>
+
+                <div class="empty-state" *ngIf="currentDocuments.length === 0">
+                    <i class="bi bi-search display-1 text-muted"></i>
+                    <p class="mt-3">Aucun résultat pour cette recherche</p>
+                    <p class="text-muted">Essayez d'autres termes de recherche ou ajustez les filtres</p>
+                </div>
+            </div>
         </div>
 
         <!-- Mode navigation -->

@@ -1,15 +1,16 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { catchError, delay, map, tap, switchMap } from 'rxjs/operators';
+import { catchError, delay, map, switchMap, tap } from 'rxjs/operators';
 import { Document, DocumentType, DocumentComment, DocumentAction, ActionType, Folder } from '../models/document.model';
 import { User, UserRole, UserLevel } from '../models/user.model';
 import { AuthService } from './auth.service';
 import { environment } from '../../environments/environment';
 import { DocumentSimulatorService } from './document-simulator.service';
 import { FilterCriteria } from '../models/filter.model';
-import { PermissionService } from '../services/permission.service';
+import { PermissionService } from './permission.service';
 import { PermissionType } from '../models/permission.model';
+import { DatabaseService } from './database.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,72 +18,100 @@ import { PermissionType } from '../models/permission.model';
 export class DocumentService {
   private apiUrl = 'http://api.example.com/api';
 
-  // Pour la démonstration, nous utilisons des données statiques
-  private mockDocuments: Document[] = [
-    {
-      id: '1',
-      originalName: 'Mariage_Diallo_Keita.pdf',
-      name: 'encrypted_123456.pdf',
-      path: '/Archives/Acte de mariage/2023/03/15/',
-      type: DocumentType.MARRIAGE_CERTIFICATE,
-      creationDate: new Date(2023, 2, 15),
-      lastModificationDate: new Date(2023, 2, 15),
-      sourceInstitution: 'Centre d\'État Civil de Bamako',
-      creator: 'Amadou Touré',
-      lastModifier: 'Amadou Touré',
-      version: 1,
-      concernedPerson1: 'Ibrahim Diallo',
-      concernedPerson2: 'Aminata Keita',
-      deleted: false,
-      size: 1024
-    },
-    {
-      id: '2',
-      originalName: 'Declaration_Naissance_Coulibaly.pdf',
-      name: 'encrypted_789012.pdf',
-      path: '/Archives/Déclaration de naissance/2023/04/10/',
-      type: DocumentType.BIRTH_DECLARATION,
-      creationDate: new Date(2023, 3, 10),
-      lastModificationDate: new Date(2023, 3, 10),
-      sourceInstitution: 'Centre de Déclaration de Ségou',
-      creator: 'Fatoumata Diarra',
-      lastModifier: 'Fatoumata Diarra',
-      version: 1,
-      concernedPerson1: 'Mamadou Coulibaly',
-      deleted: false,
-      size: 768
-    },
-    {
-      id: '3',
-      originalName: 'Jugement_Suppletif_Traoré.pdf',
-      name: 'encrypted_345678.pdf',
-      path: '/Archives/Jugement supplétif/2023/05/22/',
-      type: DocumentType.SUPPLEMENTARY_JUDGMENT,
-      creationDate: new Date(2023, 4, 22),
-      lastModificationDate: new Date(2023, 4, 22),
-      sourceInstitution: 'Tribunal de Kayes',
-      creator: 'SYSTEME',
-      lastModifier: 'SYSTEME',
-      version: 1,
-      concernedPerson1: 'Oumar Traoré',
-      deleted: false,
-      size: 1536
-    }
-  ];
-
   constructor(
     private http: HttpClient,
     private authService: AuthService,
     private permissionService: PermissionService,
-    private documentSimulator: DocumentSimulatorService
+    private documentSimulator: DocumentSimulatorService,
+    private databaseService: DatabaseService
   ) { }
 
-  // Méthodes d'accès aux API
+  // Méthode pour charger les documents par chemin d'accès
+  getDocumentsByPath(path: string): Observable<Document[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<Document[]>(`${this.apiUrl}/documents`, {
+        params: { path }
+      }).pipe(
+        catchError(error => {
+          console.error('Error fetching documents by path', error);
+          return throwError(() => new Error('Failed to load documents. Please try again later.'));
+        })
+      );
+    } else {
+      return this.databaseService.getDocumentsByPath(path).pipe(
+        map(docs => this.convertToDocumentModel(docs))
+      );
+    }
+  }
 
+  // Méthode pour convertir les données brutes en modèle Document
+  private convertToDocumentModel(rawDocs: any[]): Document[] {
+    return rawDocs.map(doc => ({
+      id: doc.id.toString(),
+      originalName: doc.nom_origine,
+      name: doc.nom,
+      path: doc.chemin,
+      type: this.mapDocumentType(doc.type_doc),
+      creationDate: new Date(doc.date_creation),
+      lastModificationDate: new Date(doc.date_derniere_modification),
+      sourceInstitution: doc.institution_source,
+      creator: doc.utilisateur_createur.toString(),
+      lastModifier: doc.utilisateur_dernier_modificateur.toString(),
+      version: doc.version,
+      concernedPerson1: doc.concerne_1,
+      concernedPerson2: doc.concerne_2 || undefined,
+      deleted: doc.supprime === 1,
+      size: doc.size || 0
+    }));
+  }
+
+  // Méthode pour mapper les types de documents
+  private mapDocumentType(type: string): DocumentType {
+    switch (type) {
+      case 'Acte de naissance': return DocumentType.BIRTH_CERTIFICATE;
+      case 'Acte de mariage': return DocumentType.MARRIAGE_CERTIFICATE;
+      case 'Acte de décès': return DocumentType.DEATH_CERTIFICATE;
+      case 'Déclaration de naissance': return DocumentType.BIRTH_DECLARATION;
+      case 'Déclaration de décès': return DocumentType.DEATH_DECLARATION;
+      case 'Certificat de décès': return DocumentType.DEATH_CERTIFICATION;
+      case 'Publication de mariage': return DocumentType.MARRIAGE_PUBLICATION;
+      case 'Certificat de non opposition': return DocumentType.NON_OPPOSITION_CERTIFICATE;
+      case 'Fiche de non inscription': return DocumentType.NON_REGISTRATION_FORM;
+      case 'Jugement supplétif': return DocumentType.SUPPLEMENTARY_JUDGMENT;
+      case 'Jugement rectificatif': return DocumentType.RECTIFICATION_JUDGMENT;
+      case 'Jugement d\'annulation': return DocumentType.CANCELLATION_JUDGMENT;
+      case 'Jugement d\'homologation': return DocumentType.HOMOLOGATION_JUDGMENT;
+      case 'Jugement déclaratif': return DocumentType.DECLARATORY_JUDGMENT;
+      default: return DocumentType.BIRTH_CERTIFICATE;
+    }
+  }
+
+  // Méthode pour obtenir le type de document sous forme de chaîne
+  getDocumentTypeString(type: DocumentType): string {
+    switch (type) {
+      case DocumentType.BIRTH_CERTIFICATE: return 'Acte de naissance';
+      case DocumentType.MARRIAGE_CERTIFICATE: return 'Acte de mariage';
+      case DocumentType.DEATH_CERTIFICATE: return 'Acte de décès';
+      case DocumentType.BIRTH_DECLARATION: return 'Déclaration de naissance';
+      case DocumentType.DEATH_DECLARATION: return 'Déclaration de décès';
+      case DocumentType.DEATH_CERTIFICATION: return 'Certificat de décès';
+      case DocumentType.MARRIAGE_PUBLICATION: return 'Publication de mariage';
+      case DocumentType.NON_OPPOSITION_CERTIFICATE: return 'Certificat de non opposition';
+      case DocumentType.NON_REGISTRATION_FORM: return 'Fiche de non inscription';
+      case DocumentType.SUPPLEMENTARY_JUDGMENT: return 'Jugement supplétif';
+      case DocumentType.RECTIFICATION_JUDGMENT: return 'Jugement rectificatif';
+      case DocumentType.CANCELLATION_JUDGMENT: return 'Jugement d\'annulation';
+      case DocumentType.HOMOLOGATION_JUDGMENT: return 'Jugement d\'homologation';
+      case DocumentType.DECLARATORY_JUDGMENT: return 'Jugement déclaratif';
+      default: return 'Type inconnu';
+    }
+  }
+
+  // Mettre à jour la méthode getDocuments pour utiliser notre base de données
   getDocuments(filterCriteria?: FilterCriteria): Observable<Document[]> {
     if (this.authService.isApiMode()) {
       let params = new HttpParams();
-      
+
       if (filterCriteria) {
         // Convertir les critères de filtre en paramètres HTTP
         Object.entries(filterCriteria).forEach(([key, value]) => {
@@ -101,7 +130,7 @@ export class DocumentService {
           }
         });
       }
-      
+
       return this.http.get<Document[]>(`${this.apiUrl}/documents`, { params }).pipe(
         catchError(error => {
           console.error('Error fetching documents', error);
@@ -109,204 +138,32 @@ export class DocumentService {
         })
       );
     } else {
-      // Mode mock amélioré pour le filtrage avancé
-      let filteredDocs = [...this.mockDocuments];
-      
-      if (filterCriteria) {
-        // Appliquer le filtre sur chaque document en fonction de l'opérateur logique
-        const operator = filterCriteria.logicalOperator || 'AND';
-        
-        if (operator === 'AND') {
-          // Opérateur AND : tous les critères doivent être satisfaits
-          Object.entries(filterCriteria).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '' && key !== 'logicalOperator') {
-              filteredDocs = this.applyFilterCriterion(filteredDocs, key, value);
-            }
-          });
-        } else {
-          // Opérateur OR : au moins un critère doit être satisfait
-          const originalDocs = [...filteredDocs];
-          const matchingDocs = new Set<string>();
-          
-          Object.entries(filterCriteria).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '' && key !== 'logicalOperator') {
-              const docsMatchingCriterion = this.applyFilterCriterion(originalDocs, key, value);
-              docsMatchingCriterion.forEach(doc => matchingDocs.add(doc.id));
-            }
-          });
-          
-          // Ne garder que les documents qui correspondent à au moins un critère
-          if (matchingDocs.size > 0) {
-            filteredDocs = originalDocs.filter(doc => matchingDocs.has(doc.id));
-          }
-        }
-        
-        // Filtrer les documents supprimés si demandé
-        if (filterCriteria.excludeDeleted) {
-          filteredDocs = filteredDocs.filter(doc => !doc.deleted);
-        }
-        
-        // Appliquer le tri
-        if (filterCriteria.sortBy) {
-          const direction = filterCriteria.sortDirection === 'desc' ? -1 : 1;
-          const sortKey = filterCriteria.sortBy as keyof Document;
-          
-          filteredDocs.sort((a, b) => {
-            const valueA = a[sortKey];
-            const valueB = b[sortKey];
-            
-            if (valueA instanceof Date && valueB instanceof Date) {
-              return direction * (valueA.getTime() - valueB.getTime());
-            }
-            
-            if (typeof valueA === 'string' && typeof valueB === 'string') {
-              return direction * valueA.localeCompare(valueB);
-            }
-            
-            if (valueA !== undefined && valueB !== undefined) {
-              if (valueA < valueB) return -1 * direction;
-              if (valueA > valueB) return 1 * direction;
-            }
-            return 0;
-          });
-        }
-        
-        // Appliquer la pagination si nécessaire
-        if (filterCriteria.pageSize && filterCriteria.pageIndex !== undefined) {
-          const startIndex = filterCriteria.pageIndex * filterCriteria.pageSize;
-          filteredDocs = filteredDocs.slice(startIndex, startIndex + filterCriteria.pageSize);
-        }
-      }
-      
-      // Simuler un délai réseau
-      return of(filteredDocs).pipe(delay(300));
-    }
-  }
-
-  private applyFilterCriterion(docs: Document[], key: string, value: any): Document[] {
-    switch (key) {
-      case 'searchTerm':
-        return docs.filter(doc => 
-          doc.originalName.toLowerCase().includes(value.toLowerCase()) || 
-          (doc.concernedPerson1 && doc.concernedPerson1.toLowerCase().includes(value.toLowerCase())) ||
-          (doc.concernedPerson2 && doc.concernedPerson2.toLowerCase().includes(value.toLowerCase())) ||
-          (doc.sourceInstitution && doc.sourceInstitution.toLowerCase().includes(value.toLowerCase()))
-        );
-        
-      case 'documentType':
-        if (Array.isArray(value)) {
-          return docs.filter(doc => value.includes(doc.type));
-        }
-        return docs.filter(doc => doc.type === value);
-        
-      case 'region':
-        if (Array.isArray(value)) {
-          return docs.filter(doc => 
-            value.some(region => doc.sourceInstitution.includes(region) || doc.path.includes(region))
-          );
-        }
-        return docs.filter(doc => 
-          doc.sourceInstitution.includes(value) || doc.path.includes(value)
-        );
-        
-      case 'startDate':
-        const startDate = value instanceof Date ? value : new Date(value);
-        return docs.filter(doc => doc.creationDate >= startDate);
-        
-      case 'endDate':
-        const endDate = value instanceof Date ? value : new Date(value);
-        return docs.filter(doc => doc.creationDate <= endDate);
-        
-      case 'concernedPerson':
-        return docs.filter(doc => 
-          (doc.concernedPerson1 && doc.concernedPerson1.toLowerCase().includes(value.toLowerCase())) ||
-          (doc.concernedPerson2 && doc.concernedPerson2.toLowerCase().includes(value.toLowerCase()))
-        );
-        
-      case 'sourceInstitution':
-        return docs.filter(doc => 
-          doc.sourceInstitution.toLowerCase().includes(value.toLowerCase())
-        );
-        
-      case 'creator':
-        return docs.filter(doc => 
-          doc.creator.toLowerCase().includes(value.toLowerCase())
-        );
-        
-      case 'lastModifier':
-        return docs.filter(doc => 
-          doc.lastModifier.toLowerCase().includes(value.toLowerCase())
-        );
-        
-      case 'path':
-        return docs.filter(doc => doc.path.startsWith(value));
-        
-      default:
-        return docs;
-    }
-  }
-
-  searchDocuments(term: string, options?: {
-    fullText?: boolean,
-    exactMatch?: boolean,
-    caseSensitive?: boolean,
-    fields?: string[]
-  }): Observable<Document[]> {
-    if (this.authService.isApiMode()) {
-      return this.http.get<Document[]>(`${this.apiUrl}/documents/search`, {
-        params: {
-          term,
-          fullText: options?.fullText ? 'true' : 'false',
-          exactMatch: options?.exactMatch ? 'true' : 'false',
-          caseSensitive: options?.caseSensitive ? 'true' : 'false',
-          fields: options?.fields ? options.fields.join(',') : ''
-        }
-      }).pipe(
-        catchError(error => {
-          console.error('Error searching documents', error);
-          return throwError(() => new Error('Failed to search documents. Please try again later.'));
-        })
+      // Convertir les critères de filtre pour notre base de données
+      const dbFilters = this.convertFilterCriteriaToDbFormat(filterCriteria);
+      return this.databaseService.getDocuments(dbFilters).pipe(
+        map(docs => this.convertToDocumentModel(docs))
       );
-    } else {
-      // Mode mock pour la recherche avancée
-      if (!term) {
-        return of([]);
-      }
-      
-      const searchTerm = options?.caseSensitive ? term : term.toLowerCase();
-      
-      // Définir les champs à rechercher
-      const fieldsToSearch = options?.fields || [
-        'originalName', 'concernedPerson1', 'concernedPerson2', 
-        'sourceInstitution', 'creator', 'lastModifier'
-      ];
-      
-      // Copier les documents mock
-      let results = [...this.mockDocuments];
-      
-      // Filtrer par terme de recherche
-      results = results.filter(doc => {
-        return fieldsToSearch.some(field => {
-          const fieldValue = doc[field as keyof Document];
-          
-          if (typeof fieldValue !== 'string') {
-            return false;
-          }
-          
-          const value = options?.caseSensitive ? fieldValue : fieldValue.toLowerCase();
-          
-          if (options?.exactMatch) {
-            return value === searchTerm;
-          } else {
-            return value.includes(searchTerm);
-          }
-        });
-      });
-      
-      return of(results).pipe(delay(300));
     }
   }
 
+  // Méthode pour convertir les critères de filtre
+  private convertFilterCriteriaToDbFormat(criteria?: FilterCriteria): any {
+    if (!criteria) return {};
+
+    return {
+      documentType: criteria.documentType ? this.getDocumentTypeString(criteria.documentType as DocumentType) : null,
+      institution: criteria.sourceInstitution,
+      region: criteria.region,
+      startDate: criteria.startDate,
+      endDate: criteria.endDate,
+      concernedPerson: criteria.concernedPerson,
+      path: criteria.path,
+      excludeDeleted: criteria.excludeDeleted,
+      searchTerm: criteria.searchTerm
+    };
+  }
+
+  // Méthode pour récupérer les dossiers racine (types de documents)
   getRootFolders(): Observable<Folder[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Folder[]>(`${this.apiUrl}/folders/root`).pipe(
@@ -316,17 +173,82 @@ export class DocumentService {
         })
       );
     } else {
-      // Pour notre démonstration, nous retournons les 3 types de documents demandés
-      return of([
-        { name: DocumentType.MARRIAGE_CERTIFICATE, path: '/Archives/Acte de mariage/', type: 'document-type' },
-        { name: DocumentType.BIRTH_DECLARATION, path: '/Archives/Déclaration de naissance/', type: 'document-type' },
-        { name: DocumentType.SUPPLEMENTARY_JUDGMENT, path: '/Archives/Jugement supplétif/', type: 'document-type' }
-      ]);
+      return this.databaseService.getDocumentTypes().pipe(
+        map(types => types.map(type => ({
+          name: type,
+          path: `/Archives/${type}/`,
+          type: 'document-type' as 'document-type',
+          iconClass: this.getFolderIcon({ name: type, path: '', type: 'document-type' }),
+          colorClass: this.getFolderColor({ name: type, path: '', type: 'document-type' })
+        })))
+      );
     }
   }
 
-  // Méthodes de navigation temporelle
+  /**
+ * Charge les dossiers en fonction du chemin et du mode de navigation
+ * @param path Chemin du dossier à charger
+ * @param navigationMode Mode de navigation (time ou location)
+ * @returns Observable de la liste des dossiers
+ */
+  loadFolders(path: string, navigationMode: 'time' | 'location'): Observable<Folder[]> {
+    // Analyser le chemin pour déterminer quel type de dossiers charger
+    const pathParts = path.split('/').filter(part => part !== '');
 
+    // Si nous sommes à la racine, retourner les dossiers racine
+    if (pathParts.length <= 1) {
+      return this.getRootFolders();
+    }
+
+    // Récupérer le type de document (premier élément après "Archives")
+    const documentType = pathParts[1];
+
+    if (navigationMode === 'time') {
+      // Navigation par temps
+      if (pathParts.length === 2) {
+        // Niveau des années
+        return this.getYearFolders(documentType);
+      } else if (pathParts.length === 3) {
+        // Niveau des mois
+        return this.getMonthFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+      } else if (pathParts.length === 4) {
+        // Niveau des jours
+        return this.getDayFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+      }
+    } else {
+      // Navigation par lieu
+      if (pathParts.length === 2) {
+        // Niveau des régions
+        return this.getRegionFolders(documentType);
+      } else if (pathParts.length === 3) {
+        // Niveau des cercles pour une région
+        return this.getCircleFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+      } else if (pathParts.length === 4) {
+        // Niveau des communes pour un cercle
+        return this.getCommuneFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+      } else if (pathParts.length === 5) {
+        if (pathParts[5] === "Centre d'état civil" || pathParts[5] === "Centre de déclaration" || pathParts[5] === "Tribunal") {
+          // Cas où nous sommes dans un type spécifique de centre
+          if (pathParts[5] === "Centre d'état civil") {
+            return this.getCivilStatusCenterFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/Centre d'état civil/`);
+          } else if (pathParts[5] === "Centre de déclaration") {
+            return this.getDeclarationCenterFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/Centre de déclaration/`);
+          } else {
+            return this.getTribunalFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/Tribunal/`);
+          }
+        } else {
+          // Niveau des centres pour une commune
+          const communePath = `/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/`;
+          return this.getCivilStatusCenterFolders(communePath);
+        }
+      }
+    }
+
+    // Par défaut, retourner un tableau vide
+    return of([]);
+  }
+
+  // Méthodes de navigation temporelle
   getYearFolders(documentType: string): Observable<Folder[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Folder[]>(`${this.apiUrl}/folders/years`, {
@@ -338,21 +260,16 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par année
-      const currentYear = new Date().getFullYear();
-      const oldestYear = currentYear - 5; // Simulation d'un document de 5 ans
-
-      const folders: Folder[] = [];
-      for (let year = currentYear; year >= oldestYear; year--) {
-        folders.push({
+      return this.databaseService.getYearsByDocumentType(documentType).pipe(
+        map(years => years.map(year => ({
           name: year.toString(),
           path: `/Archives/${documentType}/${year}/`,
-          type: 'year',
+          type: 'year' as 'year',
+          iconClass: 'bi-calendar-year',
+          colorClass: 'text-primary',
           lastModificationDate: new Date(year, 11, 31)
-        });
-      }
-
-      return of(folders);
+        })))
+      );
     }
   }
 
@@ -367,34 +284,26 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par mois
-      const pathParts = yearPath.split('/');
-      const yearString = pathParts[pathParts.length - 2];
-      // S'assurer que nous avons seulement 4 chiffres pour l'année
-      const year = parseInt(yearString.substring(0, 4), 10);
-      const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth();
+      const pathParts = yearPath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const yearStr = pathParts[pathParts.length - 1];
+      const year = parseInt(yearStr, 10);
 
       const monthNames = [
         'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
         'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
       ];
 
-      const folders: Folder[] = [];
-
-      // Pour l'année en cours, afficher seulement jusqu'au mois actuel
-      const monthLimit = (year === currentYear) ? currentMonth + 1 : 12;
-
-      for (let month = 0; month < monthLimit; month++) {
-        folders.push({
-          name: monthNames[month],
-          path: `${yearPath}${month + 1}/`,
-          type: 'month',
-          lastModificationDate: new Date(year, month, 28)
-        });
-      }
-
-      return of(folders);
+      return this.databaseService.getMonthsByYearAndType(docType, year).pipe(
+        map(months => months.map(month => ({
+          name: monthNames[month - 1],
+          path: `${yearPath}${month}/`,
+          type: 'month' as 'month',
+          iconClass: 'bi-calendar-month',
+          colorClass: 'text-success',
+          lastModificationDate: new Date(year, month - 1, 28)
+        })))
+      );
     }
   }
 
@@ -409,40 +318,29 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par jour
-      const pathParts = monthPath.split('/');
-      const yearStr = pathParts[pathParts.length - 3];
-      const monthStr = pathParts[pathParts.length - 2];
+      // Extraire les parties du chemin
+      const pathParts = monthPath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const yearStr = pathParts[pathParts.length - 2];
+      const monthStr = pathParts[pathParts.length - 1];
 
       const year = parseInt(yearStr, 10);
-      const month = parseInt(monthStr, 10) - 1; // Les mois commencent à 0 en JavaScript
+      const month = parseInt(monthStr, 10);
 
-      // Déterminer le nombre de jours dans le mois
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-      const folders: Folder[] = [];
-
-      // Créer un dossier pour chaque jour du mois
-      for (let day = 1; day <= daysInMonth; day++) {
-        // Vérifier si nous avons des documents pour ce jour (simulation)
-        const hasDocuments = Math.random() > 0.7; // 30% de chances d'avoir des documents
-
-        if (hasDocuments) {
-          folders.push({
-            name: day.toString().padStart(2, '0'),
-            path: `${monthPath}${day.toString().padStart(2, '0')}/`,
-            type: 'day',
-            lastModificationDate: new Date(year, month, day)
-          });
-        }
-      }
-
-      return of(folders);
+      return this.databaseService.getDaysByMonthYearAndType(docType, year, month).pipe(
+        map(days => days.map(day => ({
+          name: day.toString().padStart(2, '0'),
+          path: `${monthPath}${day.toString().padStart(2, '0')}/`,
+          type: 'day' as 'day',
+          iconClass: 'bi-calendar-day',
+          colorClass: 'text-info',
+          lastModificationDate: new Date(year, month - 1, day)
+        })))
+      );
     }
   }
 
   // Méthodes de navigation géographique
-
   getRegionFolders(documentType: string): Observable<Folder[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Folder[]>(`${this.apiUrl}/folders/regions`, {
@@ -454,41 +352,15 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par région
-      const regions: Folder[] = [
-        {
-          name: 'Kayes',
-          path: `/Archives/${documentType}/Kayes/`,
-          type: 'region' as 'region'
-        },
-        {
-          name: 'Koulikoro',
-          path: `/Archives/${documentType}/Koulikoro/`,
-          type: 'region' as 'region'
-        },
-        {
-          name: 'Sikasso',
-          path: `/Archives/${documentType}/Sikasso/`,
-          type: 'region' as 'region'
-        },
-        {
-          name: 'Ségou',
-          path: `/Archives/${documentType}/Ségou/`,
-          type: 'region' as 'region'
-        },
-        {
-          name: 'Mopti',
-          path: `/Archives/${documentType}/Mopti/`,
-          type: 'region' as 'region'
-        },
-        {
-          name: 'District de Bamako',
-          path: `/Archives/${documentType}/District de Bamako/`,
-          type: 'region' as 'region'
-        }
-      ];
-
-      return of(regions);
+      return this.databaseService.getRegions().pipe(
+        map(regions => regions.map(region => ({
+          name: region.nom,
+          path: `/Archives/${documentType}/${region.nom}/`,
+          type: 'region' as 'region',
+          iconClass: 'bi-geo-alt',
+          colorClass: 'text-danger'
+        })))
+      );
     }
   }
 
@@ -503,37 +375,30 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par cercle
-      const pathParts = regionPath.split('/');
-      const region = pathParts[pathParts.length - 2];
+      // Extraire les parties du chemin
+      const pathParts = regionPath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const regionName = pathParts[pathParts.length - 1];
 
-      // Cas particulier pour le District de Bamako
-      if (region === 'District de Bamako') {
-        // Le District de Bamako n'a pas de cercles, mais directement des communes
-        return this.getCommuneFolders(regionPath);
-      }
+      // Trouver l'ID de la région pour récupérer ses cercles
+      return this.databaseService.getRegions().pipe(
+        switchMap(regions => {
+          const region = regions.find(r => r.nom === regionName);
+          if (!region) {
+            return of([]);
+          }
 
-      // Pour les autres régions, générer des cercles
-      const circles: Folder[] = [];
-
-      // Nombre de cercles selon la région
-      let circleCount = 5;
-
-      if (region === 'Kayes') circleCount = 7;
-      else if (region === 'Koulikoro') circleCount = 7;
-      else if (region === 'Sikasso') circleCount = 7;
-      else if (region === 'Ségou') circleCount = 7;
-      else if (region === 'Mopti') circleCount = 8;
-
-      for (let i = 1; i <= circleCount; i++) {
-        circles.push({
-          name: `Cercle de ${region} ${i}`,
-          path: `${regionPath}Cercle de ${region} ${i}/`,
-          type: 'circle'
-        });
-      }
-
-      return of(circles);
+          return this.databaseService.getCerclesByRegion(region.id).pipe(
+            map(cercles => cercles.map(cercle => ({
+              name: cercle.nom,
+              path: `${regionPath}${cercle.nom}/`,
+              type: 'circle' as 'circle',
+              iconClass: 'bi-circle',
+              colorClass: 'text-warning'
+            })))
+          );
+        })
+      );
     }
   }
 
@@ -548,36 +413,40 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par commune
-      const pathParts = circlePath.split('/');
-      const parentName = pathParts[pathParts.length - 2];
+      // Extraire les parties du chemin
+      const pathParts = circlePath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const regionName = pathParts[pathParts.length - 2];
+      const cercleName = pathParts[pathParts.length - 1];
 
-      const communes: Folder[] = [];
+      // Trouver l'ID du cercle pour récupérer ses communes
+      return this.databaseService.getRegions().pipe(
+        switchMap(regions => {
+          const region = regions.find(r => r.nom === regionName);
+          if (!region) {
+            return of([]);
+          }
 
-      // Cas particulier pour le District de Bamako
-      if (parentName === 'District de Bamako') {
-        // Les communes du District de Bamako
-        for (let i = 1; i <= 6; i++) {
-          communes.push({
-            name: `Commune ${toRoman(i)}`,
-            path: `${circlePath}Commune ${toRoman(i)}/`,
-            type: 'commune'
-          });
-        }
-      } else {
-        // Pour les cercles, générer des communes
-        const communeCount = 5; // Nombre arbitraire pour la simulation
+          return this.databaseService.getCerclesByRegion(region.id).pipe(
+            switchMap(cercles => {
+              const cercle = cercles.find(c => c.nom === cercleName);
+              if (!cercle) {
+                return of([]);
+              }
 
-        for (let i = 1; i <= communeCount; i++) {
-          communes.push({
-            name: `Commune de ${parentName.replace('Cercle de ', '')} ${i}`,
-            path: `${circlePath}Commune de ${parentName.replace('Cercle de ', '')} ${i}/`,
-            type: 'commune'
-          });
-        }
-      }
-
-      return of(communes);
+              return this.databaseService.getCommunesByCercle(cercle.id).pipe(
+                map(communes => communes.map(commune => ({
+                  name: commune.nom,
+                  path: `${circlePath}${commune.nom}/`,
+                  type: 'commune' as 'commune',
+                  iconClass: 'bi-building',
+                  colorClass: 'text-purple'
+                })))
+              );
+            })
+          );
+        })
+      );
     }
   }
 
@@ -592,21 +461,166 @@ export class DocumentService {
         })
       );
     } else {
-      // Simuler la récupération des dossiers par centre d'état civil
-      const centers: Folder[] = [];
+      // Extraire les parties du chemin
+      const pathParts = communePath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const regionName = pathParts[pathParts.length - 3];
+      const cercleName = pathParts[pathParts.length - 2];
+      const communeName = pathParts[pathParts.length - 1];
 
-      // Nombre arbitraire de centres pour la simulation
-      const centerCount = 3;
+      // Trouver l'ID de la commune pour récupérer ses centres
+      return this.databaseService.getRegions().pipe(
+        switchMap(regions => {
+          const region = regions.find(r => r.nom === regionName);
+          if (!region) {
+            return of([]);
+          }
 
-      for (let i = 1; i <= centerCount; i++) {
-        centers.push({
-          name: `Centre d'État Civil ${String.fromCharCode(64 + i)}`,
-          path: `${communePath}Centre d'État Civil ${String.fromCharCode(64 + i)}/`,
-          type: 'center'
-        });
-      }
+          return this.databaseService.getCerclesByRegion(region.id).pipe(
+            switchMap(cercles => {
+              const cercle = cercles.find(c => c.nom === cercleName);
+              if (!cercle) {
+                return of([]);
+              }
 
-      return of(centers);
+              return this.databaseService.getCommunesByCercle(cercle.id).pipe(
+                switchMap(communes => {
+                  const commune = communes.find(c => c.nom === communeName);
+                  if (!commune) {
+                    return of([]);
+                  }
+
+                  return this.databaseService.getCentresEtatCivilByCommune(commune.id).pipe(
+                    map(centres => centres.map(centre => ({
+                      name: centre.nom,
+                      path: `${communePath}Centre d'état civil/${centre.nom}/`,
+                      type: 'center' as 'center',
+                      iconClass: 'bi-house-door',
+                      colorClass: 'text-teal'
+                    })))
+                  );
+                })
+              );
+            })
+          );
+        })
+      );
+    }
+  }
+
+  getDeclarationCenterFolders(communePath: string): Observable<Folder[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<Folder[]>(`${this.apiUrl}/folders/declaration-centers`, {
+        params: new HttpParams().set('communePath', communePath)
+      }).pipe(
+        catchError(error => {
+          console.error('Error fetching declaration center folders', error);
+          return throwError(() => new Error('Échec du chargement des centres de déclaration.'));
+        })
+      );
+    } else {
+      // Extraire les parties du chemin
+      const pathParts = communePath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const regionName = pathParts[pathParts.length - 3];
+      const cercleName = pathParts[pathParts.length - 2];
+      const communeName = pathParts[pathParts.length - 1];
+
+      // Trouver l'ID de la commune pour récupérer ses centres
+      return this.databaseService.getRegions().pipe(
+        switchMap(regions => {
+          const region = regions.find(r => r.nom === regionName);
+          if (!region) {
+            return of([]);
+          }
+
+          return this.databaseService.getCerclesByRegion(region.id).pipe(
+            switchMap(cercles => {
+              const cercle = cercles.find(c => c.nom === cercleName);
+              if (!cercle) {
+                return of([]);
+              }
+
+              return this.databaseService.getCommunesByCercle(cercle.id).pipe(
+                switchMap(communes => {
+                  const commune = communes.find(c => c.nom === communeName);
+                  if (!commune) {
+                    return of([]);
+                  }
+
+                  return this.databaseService.getCentresDeclarationByCommune(commune.id).pipe(
+                    map(centres => centres.map(centre => ({
+                      name: centre.nom,
+                      path: `${communePath}Centre de déclaration/${centre.nom}/`,
+                      type: 'center' as 'center',
+                      iconClass: 'bi-building-check',
+                      colorClass: 'text-info'
+                    })))
+                  );
+                })
+              );
+            })
+          );
+        })
+      );
+    }
+  }
+
+  getTribunalFolders(communePath: string): Observable<Folder[]> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<Folder[]>(`${this.apiUrl}/folders/tribunals`, {
+        params: new HttpParams().set('communePath', communePath)
+      }).pipe(
+        catchError(error => {
+          console.error('Error fetching tribunal folders', error);
+          return throwError(() => new Error('Échec du chargement des tribunaux.'));
+        })
+      );
+    } else {
+      // Extraire les parties du chemin
+      const pathParts = communePath.split('/').filter(part => part !== '');
+      const docType = pathParts[1];
+      const regionName = pathParts[pathParts.length - 3];
+      const cercleName = pathParts[pathParts.length - 2];
+      const communeName = pathParts[pathParts.length - 1];
+
+      // Trouver l'ID de la commune pour récupérer ses tribunaux
+      return this.databaseService.getRegions().pipe(
+        switchMap(regions => {
+          const region = regions.find(r => r.nom === regionName);
+          if (!region) {
+            return of([]);
+          }
+
+          return this.databaseService.getCerclesByRegion(region.id).pipe(
+            switchMap(cercles => {
+              const cercle = cercles.find(c => c.nom === cercleName);
+              if (!cercle) {
+                return of([]);
+              }
+
+              return this.databaseService.getCommunesByCercle(cercle.id).pipe(
+                switchMap(communes => {
+                  const commune = communes.find(c => c.nom === communeName);
+                  if (!commune) {
+                    return of([]);
+                  }
+
+                  return this.databaseService.getTribunauxByCommune(commune.id).pipe(
+                    map(tribunaux => tribunaux.map(tribunal => ({
+                      name: tribunal.nom,
+                      path: `${communePath}Tribunal/${tribunal.nom}/`,
+                      type: 'center' as 'center',
+                      iconClass: 'bi-bank',
+                      colorClass: 'text-secondary'
+                    })))
+                  );
+                })
+              );
+            })
+          );
+        })
+      );
     }
   }
 
@@ -745,16 +759,72 @@ export class DocumentService {
         })
       );
     } else {
-      // Utiliser le simulateur en mode prévisualisation
-      const document = this.mockDocuments.find(doc => doc.id === documentId);
-      if (!document) {
-        return throwError(() => new Error('Document not found'));
-      }
-      
-      const simulatedPreview = this.documentSimulator.generateSimulatedPdf(documentId, document.type, true);
-      
-      // Délai plus court pour la prévisualisation
-      return of(simulatedPreview).pipe(delay(350));
+      // Récupérer d'abord les informations du document
+      return this.getDocumentById(documentId).pipe(
+        switchMap(document => {
+          if (!document) {
+            return throwError(() => new Error('Document not found'));
+          }
+
+          // Récupérer le chemin du document
+          const filePath = document.path;
+
+          // En mode développement, nous pouvons utiliser un fetch pour récupérer le fichier local
+          return this.fetchLocalFile(filePath, true).pipe(
+            tap(() => {
+              // Enregistrer l'action de visualisation
+              this.recordDocumentAction(documentId, ActionType.VIEW).subscribe();
+            })
+          );
+        })
+      );
+    }
+  }
+
+  // Méthode auxiliaire pour récupérer un fichier local
+  private fetchLocalFile(filePath: string, isPreview: boolean = false): Observable<Blob> {
+    return new Observable<Blob>(observer => {
+      fetch(filePath)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          observer.next(blob);
+          observer.complete();
+        })
+        .catch(error => {
+          console.error('Error fetching local file:', error);
+
+          // Si le fichier n'est pas trouvé, générer un PDF simulé
+          const simulatedPdf = this.documentSimulator.generateSimulatedPdf(
+            filePath.split('/').pop() || 'document.pdf',
+            'Document simulé',
+            isPreview
+          );
+
+          observer.next(simulatedPdf);
+          observer.complete();
+        });
+    }).pipe(delay(isPreview ? 350 : 800)); // Simuler un délai réseau plus court pour la prévisualisation
+  }
+
+  // Méthode pour récupérer un document par son ID
+  getDocumentById(documentId: string): Observable<Document | null> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<Document>(`${this.apiUrl}/documents/${documentId}`).pipe(
+        catchError(error => {
+          console.error('Error fetching document', error);
+          return of(null);
+        })
+      );
+    } else {
+      // Utiliser le service de base de données
+      return this.databaseService.getDocumentById(parseInt(documentId)).pipe(
+        map(doc => doc ? this.convertToDocumentModel([doc])[0] : null)
+      );
     }
   }
 
@@ -774,68 +844,26 @@ export class DocumentService {
       );
     } else {
       // Générer un document de comparaison simulé
-      const document = this.mockDocuments.find(doc => doc.id === documentId);
-      if (!document) {
-        return throwError(() => new Error('Document not found'));
-      }
-      
-      // Créer un contenu simulé spécial pour la comparaison
-      const simulatedComparison = this.documentSimulator.generateSimulatedPdf(
-        `${documentId}_v${version1}_vs_v${version2}`, 
-        `Comparaison ${document.type}`, 
-        false
+      return this.getDocumentById(documentId).pipe(
+        switchMap(document => {
+          if (!document) {
+            return throwError(() => new Error('Document not found'));
+          }
+
+          // Créer un contenu simulé spécial pour la comparaison
+          const simulatedComparison = this.documentSimulator.generateSimulatedPdf(
+            `${documentId}_v${version1}_vs_v${version2}`,
+            `Comparaison ${document.type}`,
+            false
+          );
+
+          return of(simulatedComparison).pipe(delay(800));
+        })
       );
-      
-      return of(simulatedComparison).pipe(delay(800));
     }
   }
 
-  // Méthode générique pour charger les dossiers selon le mode de navigation
-  loadFolders(path: string, navigationType: 'time' | 'location'): Observable<Folder[]> {
-    // Analyser le chemin pour déterminer le niveau actuel
-    const pathParts = path.split('/').filter(part => part !== '');
-
-    // Si nous sommes à la racine, retourner les types de documents
-    if (pathParts.length === 0 || (pathParts.length === 1 && pathParts[0] === 'Archives')) {
-      return this.getRootFolders();
-    }
-
-    // Récupérer le type de document (toujours le premier élément après "Archives")
-    const documentType = pathParts[1];
-
-    if (navigationType === 'time') {
-      // Navigation par temps
-      if (pathParts.length === 2) {
-        // Niveau des années
-        return this.getYearFolders(documentType);
-      } else if (pathParts.length === 3) {
-        // Niveau des mois
-        return this.getMonthFolders(path);
-      } else if (pathParts.length === 4) {
-        // Niveau des jours
-        return this.getDayFolders(path);
-      }
-    } else {
-      // Navigation par lieu
-      if (pathParts.length === 2) {
-        // Niveau des régions
-        return this.getRegionFolders(documentType);
-      } else if (pathParts.length === 3) {
-        // Niveau des cercles (ou communes pour Bamako)
-        return this.getCircleFolders(path);
-      } else if (pathParts.length === 4) {
-        // Niveau des communes (ou centres pour Bamako)
-        return this.getCommuneFolders(path);
-      } else if (pathParts.length === 5) {
-        // Niveau des centres d'état civil
-        return this.getCivilStatusCenterFolders(path);
-      }
-    }
-
-    // Si le niveau n'est pas reconnu, retourner un tableau vide
-    return of([]);
-  }
-
+  // Méthode pour obtenir les versions d'un document
   getDocumentVersions(documentId: string): Observable<Document[]> {
     if (this.authService.isApiMode()) {
       return this.http.get<Document[]>(`${this.apiUrl}/documents/${documentId}/versions`).pipe(
@@ -846,38 +874,45 @@ export class DocumentService {
       );
     } else {
       // Simuler les versions d'un document
-      const document = this.mockDocuments.find(doc => doc.id === documentId);
+      return this.getDocumentById(documentId).pipe(
+        switchMap(document => {
+          if (!document) {
+            return throwError(() => new Error('Document not found'));
+          }
 
-      if (!document) {
-        return throwError(() => new Error('Document not found'));
-      }
+          const versions: Document[] = [{ ...document }];
 
-      const versions: Document[] = [
-        { ...document },
-        {
-          ...document,
-          id: `${document.id}_v1`,
-          version: document.version - 1,
-          lastModificationDate: new Date(document.lastModificationDate.getTime() - 7 * 24 * 60 * 60 * 1000)
-        }
-      ];
+          // Ajouter des versions antérieures si la version actuelle est supérieure à 1
+          if (document.version > 1) {
+            for (let i = document.version - 1; i >= 1; i--) {
+              versions.push({
+                ...document,
+                id: `${document.id}_v${i}`,
+                version: i,
+                lastModificationDate: new Date(document.lastModificationDate.getTime() - (document.version - i) * 7 * 24 * 60 * 60 * 1000)
+              });
+            }
+          }
 
-      return of(versions);
+          return of(versions);
+        })
+      );
     }
   }
 
+  // Méthode pour télécharger un document
   downloadDocument(documentId: string): Observable<Blob> {
     // Vérifier les permissions avant de télécharger
     return this.permissionService.checkPermission(
-      PermissionType.DOWNLOAD, 
-      'document', 
+      PermissionType.DOWNLOAD,
+      'document',
       documentId
     ).pipe(
       switchMap(result => {
         if (!result.granted) {
           return throwError(() => new Error(result.reason || 'Permission denied'));
         }
-        
+
         // Permission accordée, procéder au téléchargement
         if (this.authService.isApiMode()) {
           return this.http.get(`${this.apiUrl}/documents/${documentId}/download`, {
@@ -893,20 +928,23 @@ export class DocumentService {
             })
           );
         } else {
-          // Code existant du mode simulation...
-          const document = this.mockDocuments.find(doc => doc.id === documentId);
-          if (!document) {
-            return throwError(() => new Error('Document not found'));
-          }
-          
-          const simulatedPdf = this.documentSimulator.generateSimulatedPdf(documentId, document.type, false);
-          
-          // Simuler un délai réseau réaliste pour le téléchargement complet
-          return of(simulatedPdf).pipe(
-            delay(1200),
-            tap(() => {
-              // Enregistrer l'action de téléchargement
-              this.recordDocumentAction(documentId, ActionType.DOWNLOAD).subscribe();
+          // Récupérer d'abord les informations du document
+          return this.getDocumentById(documentId).pipe(
+            switchMap(document => {
+              if (!document) {
+                return throwError(() => new Error('Document not found'));
+              }
+
+              // Récupérer le chemin du document
+              const filePath = document.path;
+
+              // En mode développement, nous pouvons utiliser un fetch pour récupérer le fichier local
+              return this.fetchLocalFile(filePath).pipe(
+                tap(() => {
+                  // Enregistrer l'action de téléchargement
+                  this.recordDocumentAction(documentId, ActionType.DOWNLOAD).subscribe();
+                })
+              );
             })
           );
         }
@@ -914,36 +952,74 @@ export class DocumentService {
     );
   }
 
+  // Méthode pour partager un document par email
   shareDocumentByEmail(documentId: string, emailAddress: string, options?: {
     subject?: string,
     message?: string,
     includePreview?: boolean
   }): Observable<boolean> {
-    if (this.authService.isApiMode()) {
-      return this.http.post<boolean>(`${this.apiUrl}/documents/${documentId}/share`, { 
-        emailAddress,
-        subject: options?.subject || 'Partage de document',
-        message: options?.message || 'Veuillez trouver ci-joint le document demandé.',
-        includePreview: options?.includePreview !== undefined ? options.includePreview : true
-      }).pipe(
-        catchError(error => {
-          console.error('Error sharing document', error);
-          return throwError(() => new Error('Failed to share document. Please try again later.'));
-        })
-      );
-    } else {
-      // Mode simulation amélioré
-      console.log(`Document ${documentId} partagé avec ${emailAddress}`);
-      console.log('Options:', options);
-      
-      // Simuler un délai réseau plus réaliste
-      return of(true).pipe(delay(800));
-    }
+    // Vérifier les permissions avant de partager
+    return this.permissionService.checkPermission(
+      PermissionType.SHARE,
+      'document',
+      documentId
+    ).pipe(
+      switchMap(result => {
+        if (!result.granted) {
+          return throwError(() => new Error(result.reason || 'Permission denied'));
+        }
+
+        if (this.authService.isApiMode()) {
+          return this.http.post<boolean>(`${this.apiUrl}/documents/${documentId}/share`, {
+            emailAddress,
+            subject: options?.subject || 'Partage de document',
+            message: options?.message || 'Veuillez trouver ci-joint le document demandé.',
+            includePreview: options?.includePreview !== undefined ? options.includePreview : true
+          }).pipe(
+            tap(() => {
+              // Enregistrer l'action de partage
+              this.recordDocumentAction(
+                documentId,
+                ActionType.SHARE,
+                `Partagé avec ${emailAddress}`
+              ).subscribe();
+            }),
+            catchError(error => {
+              console.error('Error sharing document', error);
+              return throwError(() => new Error('Failed to share document. Please try again later.'));
+            })
+          );
+        } else {
+          // En mode simulation, enregistrer l'action et retourner un succès après un délai
+          console.log(`Document ${documentId} partagé avec ${emailAddress}`);
+          console.log('Options:', options);
+
+          // Enregistrer l'action de partage
+          this.recordDocumentAction(
+            documentId,
+            ActionType.SHARE,
+            `Partagé avec ${emailAddress}`
+          ).subscribe();
+
+          return of(true).pipe(delay(800));
+        }
+      })
+    );
   }
 
   // Fonction utilitaire pour obtenir l'icône en fonction du type de dossier
   getFolderIcon(folder: Folder): string {
     switch (folder.type) {
+      case 'document-type':
+        // Icône spécifique selon le type de document
+        if (folder.name.includes('mariage')) return 'bi-heart-fill';
+        if (folder.name.includes('naissance')) return 'bi-person-plus-fill';
+        if (folder.name.includes('décès')) return 'bi-person-dash-fill';
+        if (folder.name.includes('jugement')) return 'bi-gavel';
+        if (folder.name.includes('certificat')) return 'bi-patch-check-fill';
+        if (folder.name.includes('fiche')) return 'bi-file-earmark-text-fill';
+        if (folder.name.includes('publication')) return 'bi-megaphone-fill';
+        return 'bi-folder-fill';
       case 'year':
         return 'bi-calendar-year';
       case 'month':
@@ -959,13 +1035,23 @@ export class DocumentService {
       case 'center':
         return 'bi-house-door';
       default:
-        return 'bi-folder';
+        return 'bi-folder-fill';
     }
   }
 
   // Fonction utilitaire pour obtenir la couleur en fonction du type de dossier
   getFolderColor(folder: Folder): string {
     switch (folder.type) {
+      case 'document-type':
+        // Couleur spécifique selon le type de document
+        if (folder.name.includes('mariage')) return 'text-danger';
+        if (folder.name.includes('naissance')) return 'text-success';
+        if (folder.name.includes('décès')) return 'text-secondary';
+        if (folder.name.includes('jugement')) return 'text-info';
+        if (folder.name.includes('certificat')) return 'text-primary';
+        if (folder.name.includes('fiche')) return 'text-teal';
+        if (folder.name.includes('publication')) return 'text-purple';
+        return 'text-warning';
       case 'year':
         return 'text-primary';
       case 'month':
@@ -984,95 +1070,4 @@ export class DocumentService {
         return 'text-warning';
     }
   }
-
-  // Méthodes utilitaires
-
-  getDocumentType(path: string): DocumentType | null {
-    for (const type of Object.values(DocumentType)) {
-      if (path.includes(type)) {
-        return type as DocumentType;
-      }
-    }
-    return null;
-  }
-
-  getDocumentByPath(path: string): Observable<Document | null> {
-    return this.getDocuments().pipe(
-      map(documents => documents.find(doc => doc.path === path) || null)
-    );
-  }
-
-  canUserAccessDocument(documentId: string): Observable<boolean> {
-    const currentUser = this.authService.getCurrentUser();
-
-    if (!currentUser) {
-      return of(false);
-    }
-
-    // En mode API, vérifier l'accès via le backend
-    if (this.authService.isApiMode()) {
-      return this.http.get<boolean>(`${this.apiUrl}/documents/${documentId}/access-check`).pipe(
-        catchError(error => {
-          console.error('Error checking document access', error);
-          return of(false);
-        })
-      );
-    } else {
-      // En mode mock, vérifier en fonction du rôle et du niveau de responsabilité
-      const document = this.mockDocuments.find(doc => doc.id === documentId);
-
-      if (!document) {
-        return of(false);
-      }
-
-      // Accès pour l'administrateur
-      if (currentUser.role === UserRole.ADMIN) {
-        return of(true);
-      }
-
-      // Accès pour les utilisateurs selon leur niveau et zone
-      const documentRegion = this.extractRegionFromPath(document.path);
-
-      if (currentUser.level === UserLevel.REGIONAL && currentUser.regions?.includes(documentRegion)) {
-        return of(true);
-      }
-
-      const documentCenter = this.extractCenterFromPath(document.path);
-
-      if (
-        (currentUser.level === UserLevel.CENTER && currentUser.centers?.includes(documentCenter)) ||
-        (currentUser.level === UserLevel.COURT && document.sourceInstitution.includes('Tribunal')) ||
-        (currentUser.level === UserLevel.DECLARATION_CENTER && document.sourceInstitution.includes('Centre de Déclaration'))
-      ) {
-        return of(true);
-      }
-
-      return of(false);
-    }
-  }
-
-  private extractRegionFromPath(path: string): string {
-    const regions = [
-      'Kayes', 'Koulikoro', 'Sikasso', 'Ségou', 'Mopti', 'District de Bamako'
-    ];
-
-    for (const region of regions) {
-      if (path.includes(region)) {
-        return region;
-      }
-    }
-
-    return '';
-  }
-
-  private extractCenterFromPath(path: string): string {
-    const match = path.match(/Centre d'État Civil [A-Z]/);
-    return match ? match[0] : '';
-  }
-}
-
-// Fonction utilitaire pour convertir un nombre en chiffres romains (pour les communes de Bamako)
-function toRoman(num: number): string {
-  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-  return roman[num - 1] || num.toString();
 }
