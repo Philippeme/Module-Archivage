@@ -1,156 +1,155 @@
+<!-- src/app/components/advanced-filter/advanced-filter.component.html -->
 <div class="advanced-filter-container">
-    <div class="filter-header">
-        <div class="d-flex align-items-center">
-            <button class="btn btn-sm me-2" [ngClass]="isFilterExpanded ? 'btn-primary' : 'btn-outline-primary'"
-                (click)="toggleFilterPanel()">
-                <i class="bi bi-funnel me-1"></i>
-                Filtres avancés
-            </button>
+    <div [formGroup]="filterForm" class="filter-form">
+        <!-- Contrôle de l'opérateur logique -->
+        <div class="form-group mb-3">
+            <label class="form-label">Opérateur logique</label>
+            <div class="btn-group w-100" role="group">
+                <input type="radio" class="btn-check" formControlName="logicalOperator" id="logicalOperatorAND"
+                    value="AND" autocomplete="off">
+                <label class="btn btn-outline-primary" for="logicalOperatorAND">
+                    <i class="bi bi-check2-all me-1"></i> Tous les critères (ET)
+                </label>
 
-            <div class="dropdown" *ngIf="savedFilters.length > 0">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="savedFiltersDropdown"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-                    Filtres sauvegardés
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="savedFiltersDropdown">
-                    <li *ngFor="let filter of savedFilters">
-                        <a class="dropdown-item d-flex justify-content-between align-items-center"
-                            (click)="loadFilter(filter.id)">
-                            <span>
-                                {{ filter.name }}
-                                <i *ngIf="filter.isDefault" class="bi bi-star-fill text-warning ms-1"
-                                    title="Filtre par défaut"></i>
-                            </span>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-link p-0 text-primary"
-                                    (click)="setDefaultFilter(filter.id); $event.stopPropagation()"
-                                    title="Définir comme filtre par défaut">
-                                    <i class="bi bi-star"></i>
-                                </button>
-                                <button class="btn btn-sm btn-link p-0 text-danger ms-2"
-                                    (click)="deleteFilter(filter.id, $event)" title="Supprimer">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </a>
-                    </li>
-                </ul>
+                <input type="radio" class="btn-check" formControlName="logicalOperator" id="logicalOperatorOR"
+                    value="OR" autocomplete="off">
+                <label class="btn btn-outline-primary" for="logicalOperatorOR">
+                    <i class="bi bi-check2 me-1"></i> Au moins un critère (OU)
+                </label>
             </div>
         </div>
 
-        <div class="filter-controls">
-            <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">
-                <i class="bi bi-x-circle me-1"></i>
-                Réinitialiser
-            </button>
-            <button class="btn btn-sm btn-outline-success ms-2" (click)="openSaveFilterDialog()">
-                <i class="bi bi-save me-1"></i>
-                Sauvegarder
-            </button>
+        <!-- Filtres principaux -->
+        <div class="row">
+            <!-- Type de document -->
+            <div class="col-md-4 mb-3">
+                <label for="documentType" class="form-label">Type de document</label>
+                <select class="form-select" id="documentType" formControlName="documentType">
+                    <option [ngValue]="null">Tous</option>
+                    <option *ngFor="let type of documentTypes" [value]="type">{{ type }}</option>
+                </select>
+            </div>
+
+            <!-- Personne concernée -->
+            <div class="col-md-4 mb-3">
+                <label for="concernedPerson" class="form-label">Personne concernée</label>
+                <input type="text" class="form-control" id="concernedPerson" formControlName="concernedPerson"
+                    placeholder="Nom de la personne">
+            </div>
+
+            <!-- Institution source -->
+            <div class="col-md-4 mb-3">
+                <label for="sourceInstitution" class="form-label">Institution source</label>
+                <select class="form-select" id="sourceInstitution" formControlName="sourceInstitution">
+                    <option [ngValue]="null">Toutes</option>
+                    <option value="Centre d'état civil">Centre d'état civil</option>
+                    <option value="Centre de déclaration">Centre de déclaration</option>
+                    <option value="Tribunal">Tribunal</option>
+                </select>
+            </div>
         </div>
-    </div>
 
-    <div class="filter-panel" [ngClass]="{'expanded': isFilterExpanded}">
-        <div [formGroup]="filterForm" class="filter-form">
-            <!-- Contrôle de l'opérateur logique -->
-            <div class="form-group mb-3">
-                <label class="form-label">Opérateur logique</label>
-                <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check" formControlName="logicalOperator" id="logicalOperatorAND"
-                        value="AND" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="logicalOperatorAND">
-                        <i class="bi bi-check2-all me-1"></i> Tous les critères (ET)
-                    </label>
-
-                    <input type="radio" class="btn-check" formControlName="logicalOperator" id="logicalOperatorOR"
-                        value="OR" autocomplete="off">
-                    <label class="btn btn-outline-primary" for="logicalOperatorOR">
-                        <i class="bi bi-check2 me-1"></i> Au moins un critère (OU)
-                    </label>
+        <!-- Période -->
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Période</label>
+                <div class="input-group">
+                    <span class="input-group-text">Du</span>
+                    <input type="date" class="form-control" formControlName="startDate">
+                    <span class="input-group-text">au</span>
+                    <input type="date" class="form-control" formControlName="endDate">
                 </div>
             </div>
 
-            <div class="row">
-                <!-- Type de document -->
-                <div class="col-md-4 mb-3">
-                    <label for="documentType" class="form-label">Type de document</label>
-                    <select class="form-select" id="documentType" formControlName="documentType">
-                        <option [ngValue]="null">Tous</option>
-                        <option *ngFor="let type of documentTypes" [value]="type">{{ type }}</option>
+            <!-- Tri -->
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Tri</label>
+                <div class="input-group">
+                    <span class="input-group-text">Par</span>
+                    <select class="form-select" formControlName="sortBy">
+                        <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label }}
+                        </option>
+                    </select>
+                    <select class="form-select" formControlName="sortDirection">
+                        <option *ngFor="let direction of sortDirections" [value]="direction.value">{{
+                            direction.label }}</option>
                     </select>
                 </div>
+            </div>
+        </div>
 
+        <!-- Filtres géographiques -->
+        <div class="geographic-filters">
+            <h6 class="filter-section-title">Filtres géographiques</h6>
+            <div class="row">
                 <!-- Région -->
                 <div class="col-md-4 mb-3">
                     <label for="region" class="form-label">Région</label>
-                    <select class="form-select" id="region" formControlName="region">
+                    <select class="form-select" id="region" [ngModel]="selectedRegion?.id"
+                        (ngModelChange)="onRegionChange($event)" [ngModelOptions]="{standalone: true}">
                         <option [ngValue]="null">Toutes</option>
-                        <option *ngFor="let region of regions" [value]="region">{{ region }}</option>
+                        <option *ngFor="let region of regions" [ngValue]="region.id">{{ region.nom }}</option>
+                    </select>
+                </div>
+
+                <!-- Cercle -->
+                <div class="col-md-4 mb-3">
+                    <label for="cercle" class="form-label">Cercle</label>
+                    <select class="form-select" id="cercle" [disabled]="!selectedRegion"
+                        [ngModel]="selectedCercle?.id" (ngModelChange)="onCercleChange($event)"
+                        [ngModelOptions]="{standalone: true}">
+                        <option [ngValue]="null">Tous</option>
+                        <option *ngFor="let cercle of cercles" [ngValue]="cercle.id">{{ cercle.nom }}</option>
+                    </select>
+                </div>
+
+                <!-- Commune -->
+                <div class="col-md-4 mb-3">
+                    <label for="commune" class="form-label">Commune</label>
+                    <select class="form-select" id="commune" [disabled]="!selectedCercle"
+                        [ngModel]="selectedCommune?.id" (ngModelChange)="onCommuneChange($event)"
+                        [ngModelOptions]="{standalone: true}">
+                        <option [ngValue]="null">Toutes</option>
+                        <option *ngFor="let commune of communes" [ngValue]="commune.id">{{ commune.nom }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row" *ngIf="selectedCommune">
+                <!-- Centre d'état civil -->
+                <div class="col-md-4 mb-3">
+                    <label for="centreEtatCivil" class="form-label">Centre d'état civil</label>
+                    <select class="form-select" id="centreEtatCivil" formControlName="centreEtatCivil"
+                        (ngModelChange)="onCentreEtatCivilChange($event)">
+                        <option [ngValue]="null">Tous</option>
+                        <option *ngFor="let centre of centresEtatCivil" [ngValue]="centre.id">{{ centre.nom }}</option>
+                    </select>
+                </div>
+
+                <!-- Centre de déclaration -->
+                <div class="col-md-4 mb-3">
+                    <label for="centreDeclaration" class="form-label">Centre de déclaration</label>
+                    <select class="form-select" id="centreDeclaration" formControlName="centreDeclaration"
+                        (ngModelChange)="onCentreDeclarationChange($event)">
+                        <option [ngValue]="null">Tous</option>
+                        <option *ngFor="let centre of centresDeclaration" [ngValue]="centre.id">{{ centre.nom }}</option>
                     </select>
                 </div>
 
                 <!-- Tribunal -->
                 <div class="col-md-4 mb-3">
                     <label for="tribunal" class="form-label">Tribunal</label>
-                    <select class="form-select" id="tribunal" formControlName="tribunal">
+                    <select class="form-select" id="tribunal" formControlName="tribunal"
+                        (ngModelChange)="onTribunalChange($event)">
                         <option [ngValue]="null">Tous</option>
-                        <option *ngFor="let tribunal of tribunals" [value]="tribunal">{{ tribunal }}</option>
+                        <option *ngFor="let tribunal of tribunaux" [ngValue]="tribunal.id">{{ tribunal.nom }}</option>
                     </select>
                 </div>
             </div>
+        </div>
 
-            <div class="row">
-                <!-- Personne concernée -->
-                <div class="col-md-4 mb-3">
-                    <label for="concernedPerson" class="form-label">Personne concernée</label>
-                    <input type="text" class="form-control" id="concernedPerson" formControlName="concernedPerson"
-                        placeholder="Nom de la personne">
-                </div>
-
-                <!-- Institution source -->
-                <div class="col-md-4 mb-3">
-                    <label for="sourceInstitution" class="form-label">Institution source</label>
-                    <input type="text" class="form-control" id="sourceInstitution" formControlName="sourceInstitution"
-                        placeholder="Nom de l'institution">
-                </div>
-
-                <!-- Créateur -->
-                <div class="col-md-4 mb-3">
-                    <label for="creator" class="form-label">Créateur</label>
-                    <input type="text" class="form-control" id="creator" formControlName="creator"
-                        placeholder="Nom du créateur">
-                </div>
-            </div>
-
-            <div class="row">
-                <!-- Période -->
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Période</label>
-                    <div class="input-group">
-                        <span class="input-group-text">Du</span>
-                        <input type="date" class="form-control" formControlName="startDate">
-                        <span class="input-group-text">au</span>
-                        <input type="date" class="form-control" formControlName="endDate">
-                    </div>
-                </div>
-
-                <!-- Tri -->
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Tri</label>
-                    <div class="input-group">
-                        <span class="input-group-text">Par</span>
-                        <select class="form-select" formControlName="sortBy">
-                            <option *ngFor="let option of sortOptions" [value]="option.value">{{ option.label }}
-                            </option>
-                        </select>
-                        <select class="form-select" formControlName="sortDirection">
-                            <option *ngFor="let direction of sortDirections" [value]="direction.value">{{
-                                direction.label }}</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
+        <!-- Options additionnelles -->
+        <div class="additional-options">
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" id="excludeDeleted" formControlName="excludeDeleted">
                 <label class="form-check-label" for="excludeDeleted">Exclure les documents supprimés</label>

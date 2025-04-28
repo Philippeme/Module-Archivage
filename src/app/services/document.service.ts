@@ -11,6 +11,7 @@ import { FilterCriteria } from '../models/filter.model';
 import { PermissionService } from './permission.service';
 import { PermissionType } from '../models/permission.model';
 import { DatabaseService } from './database.service';
+import { DocumentStorageDirective } from '../directives/document-storage.directive';
 
 @Injectable({
   providedIn: 'root'
@@ -63,6 +64,104 @@ export class DocumentService {
       deleted: doc.supprime === 1,
       size: doc.size || 0
     }));
+  }
+
+  // Ajouter à DocumentService.ts
+  /**
+   * Calcule la taille réelle d'un document à partir de son chemin
+   * @param documentPath Chemin du document
+   * @returns Taille du document en octets
+   */
+  calculateDocumentSize(documentPath: string): Observable<number> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<{ size: number }>(`${this.apiUrl}/documents/size?path=${encodeURIComponent(documentPath)}`).pipe(
+        map(response => response.size),
+        catchError(error => {
+          console.error('Error calculating document size', error);
+          return of(0); // Retourner 0 en cas d'erreur
+        })
+      );
+    } else {
+      // En mode simulation, utiliser une taille aléatoire réaliste
+      const minSize = 100 * 1024; // 100 Ko
+      const maxSize = 5 * 1024 * 1024; // 5 Mo
+      const randomSize = Math.floor(Math.random() * (maxSize - minSize) + minSize);
+      return of(randomSize).pipe(delay(300));
+    }
+  }
+
+  /**
+   * Vérifie si un document est stocké localement
+   * @param documentId ID du document
+   * @returns true si le document est en cache
+   */
+  isDocumentCached(documentId: string): Observable<boolean> {
+    if (this.authService.isApiMode()) {
+      return this.http.get<{ cached: boolean }>(`${this.apiUrl}/documents/${documentId}/cached`).pipe(
+        map(response => response.cached),
+        catchError(error => {
+          console.error('Error checking document cache', error);
+          return of(false);
+        })
+      );
+    } else {
+      // En mode simulation, on utilise localStorage pour simuler un cache
+      const cachedDocuments = localStorage.getItem('cachedDocuments');
+      if (cachedDocuments) {
+        try {
+          const documents = JSON.parse(cachedDocuments) as string[];
+          return of(documents.includes(documentId)).pipe(delay(100));
+        } catch (error) {
+          console.error('Error parsing cached documents', error);
+          return of(false);
+        }
+      }
+      return of(false);
+    }
+  }
+
+  /**
+   * Met en cache un document
+   * @param documentId ID du document
+   * @returns true si la mise en cache a réussi
+   */
+  cacheDocument(documentId: string): Observable<boolean> {
+    if (this.authService.isApiMode()) {
+      return this.http.post<{ success: boolean }>(`${this.apiUrl}/documents/${documentId}/cache`, {}).pipe(
+        map(response => response.success),
+        catchError(error => {
+          console.error('Error caching document', error);
+          return of(false);
+        })
+      );
+    } else {
+      // En mode simulation, on utilise localStorage pour simuler un cache
+      return this.getDocumentById(documentId).pipe(
+        switchMap(document => {
+          if (!document) {
+            return of(false);
+          }
+
+          const cachedDocuments = localStorage.getItem('cachedDocuments');
+          let documents: string[] = [];
+
+          if (cachedDocuments) {
+            try {
+              documents = JSON.parse(cachedDocuments) as string[];
+            } catch (error) {
+              console.error('Error parsing cached documents', error);
+            }
+          }
+
+          if (!documents.includes(documentId)) {
+            documents.push(documentId);
+            localStorage.setItem('cachedDocuments', JSON.stringify(documents));
+          }
+
+          return of(true).pipe(delay(500)); // Simuler une opération de mise en cache
+        })
+      );
+    }
   }
 
   // Méthode pour mapper les types de documents

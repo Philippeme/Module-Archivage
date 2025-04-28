@@ -1,68 +1,73 @@
+/* src/app/components/folder-tree/folder-tree.component.scss */
 .folder-tree {
     height: 100%;
     overflow-y: auto;
     padding: 10px 0;
     position: relative;
-}
-
-.tree-root {
+  }
+  
+  .tree-root {
     list-style-type: none;
     padding-left: 0;
     margin-bottom: 0;
-}
-
-.tree-children {
+  }
+  
+  .tree-children {
     list-style-type: none;
     padding-left: 20px;
     margin-bottom: 0;
-}
-
-.tree-item {
+  }
+  
+  .tree-item {
     display: flex;
     align-items: center;
     padding: 5px;
     cursor: pointer;
     border-radius: 4px;
-
+  
     &:hover {
-        background-color: #f0f0f0;
+      background-color: #f0f0f0;
     }
-
+  
     &.active {
-        background-color: #e9ecef;
-        font-weight: 500;
-
-        .tree-label {
-            color: #0d6efd;
-        }
+      background-color: #e9ecef;
+      font-weight: 500;
+  
+      .tree-label {
+        color: #0d6efd;
+      }
     }
-}
-
-.tree-toggle {
+  }
+  
+  .tree-toggle {
     display: flex;
     align-items: center;
     width: 25px;
     cursor: pointer;
-}
-
-.tree-label {
+  }
+  
+  .tree-label {
     margin-left: 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-/* Ajouter cette règle pour créer un décalage supplémentaire pour les sous-menus */
-.tree-children .tree-label {
+  }
+  
+  /* Ajouter cette règle pour créer un décalage supplémentaire pour les sous-menus */
+  .tree-children .tree-label {
     margin-left: 14px;
     /* Marge légèrement plus grande pour les sous-niveaux */
-}
-
-.folder-root {
+  }
+  
+  .folder-root {
     font-weight: bold;
-}
-
-.spinner-container {
+  }
+  
+  .root-icon {
+    font-size: 1.2em; /* Agrandir l'icône Archives */
+  }
+  
+  .spinner-container {
     position: absolute;
     top: 0;
     left: 0;
@@ -72,4 +77,4 @@
     align-items: center;
     justify-content: center;
     background-color: rgba(255, 255, 255, 0.7);
-}
+  }

@@ -38,125 +38,127 @@
     <div class="main-content">
         <!-- Barre de recherche -->
         <div class="search-container">
-            <app-search-bar (search)="onSearch($event)"></app-search-bar>
+            <div class="search-bar-wrapper">
+                <app-search-bar (search)="onSearch($event)"></app-search-bar>
+
+                <div class="filter-buttons">
+                    <button class="btn btn-sm" [class.active]="isFilterExpanded" (click)="toggleFilterPanel()">
+                        <i class="bi bi-funnel me-1"></i>
+                        Filtres avancés
+                    </button>
+
+                    <div class="dropdown" *ngIf="savedFilters.length > 0">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                            id="savedFiltersDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Filtres sauvegardés
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="savedFiltersDropdown">
+                            <li *ngFor="let filter of savedFilters">
+                                <a class="dropdown-item d-flex justify-content-between align-items-center"
+                                    (click)="loadFilter(filter.id)">
+                                    <span>
+                                        {{ filter.name }}
+                                        <i *ngIf="filter.isDefault" class="bi bi-star-fill text-warning ms-1"
+                                            title="Filtre par défaut"></i>
+                                    </span>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-link p-0 text-primary"
+                                            (click)="setDefaultFilter(filter.id); $event.stopPropagation()"
+                                            title="Définir comme filtre par défaut">
+                                            <i class="bi bi-star"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-link p-0 text-danger ms-2"
+                                            (click)="deleteFilter(filter.id, $event)" title="Supprimer">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Barre d'outils -->
         <div class="toolbar">
-            <div class="navigation-controls">
-                <button class="btn btn-sm btn-outline-secondary" [disabled]="!canNavigateBack()"
-                    (click)="navigateBack()">
-                    <i class="bi bi-arrow-left"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-secondary ms-1" [disabled]="!canNavigateForward()"
-                    (click)="navigateForward()">
-                    <i class="bi bi-arrow-right"></i>
-                </button>
-            </div>
+            <div class="d-flex justify-content-between w-100">
+                <div class="navigation-and-view-controls">
+                    <div class="navigation-controls">
+                        <button class="btn btn-sm btn-outline-secondary" [disabled]="!canNavigateBack()"
+                            (click)="navigateBack()">
+                            <i class="bi bi-arrow-left"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ms-1" [disabled]="!canNavigateForward()"
+                            (click)="navigateForward()">
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
 
-            <div class="view-controls ms-3">
-                <button class="btn btn-sm" [class.active]="viewMode === 'list'" (click)="setViewMode('list')">
-                    <i class="bi bi-list"></i> Liste
-                </button>
-                <button class="btn btn-sm" [class.active]="viewMode === 'grid'" (click)="setViewMode('grid')">
-                    <i class="bi bi-grid"></i> Icônes
-                </button>
-            </div>
+                    <div class="view-controls ms-3" *ngIf="!isFilterExpanded">
+                        <button class="btn btn-sm" [class.active]="viewMode === 'list'" (click)="setViewMode('list')">
+                            <i class="bi bi-list"></i> Liste
+                        </button>
+                        <button class="btn btn-sm" [class.active]="viewMode === 'grid'" (click)="setViewMode('grid')">
+                            <i class="bi bi-grid"></i> Icônes
+                        </button>
+                    </div>
 
-            <div class="organization-controls ms-3" *ngIf="currentPath !== '/Archives'">
-                <div class="btn-group" role="group">
-                    <button class="btn btn-sm" [class.active]="navigationMode === 'time'"
-                        (click)="setNavigationMode('time')">
-                        <i class="bi bi-calendar3"></i> Par temps
+                    <div class="organization-controls ms-3" *ngIf="currentPath !== '/Archives' && !isFilterExpanded">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-sm" [class.active]="navigationMode === 'date'"
+                                (click)="setNavigationMode('date')">
+                                <i class="bi bi-calendar3"></i> Par date
+                            </button>
+                            <button class="btn btn-sm" [class.active]="navigationMode === 'location'"
+                                (click)="setNavigationMode('location')">
+                                <i class="bi bi-geo-alt"></i> Par lieu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boutons de filtre (n'apparaissent que lorsque les filtres avancés sont activés) -->
+                <div class="filter-action-buttons" *ngIf="isFilterExpanded">
+                    <button class="btn btn-sm btn-outline-secondary me-2" (click)="resetFilters()">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Réinitialiser
                     </button>
-                    <button class="btn btn-sm" [class.active]="navigationMode === 'location'"
-                        (click)="setNavigationMode('location')">
-                        <i class="bi bi-geo-alt"></i> Par lieu
+                    <button class="btn btn-sm btn-success" (click)="saveCurrentFilter()">
+                        <i class="bi bi-save me-1"></i>
+                        Sauvegarder
                     </button>
                 </div>
-            </div>
 
-            <!-- Bouton pour ouvrir plusieurs onglets -->
-            <div class="btn-group ms-3">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
-                    aria-expanded="false">
-                    <i class="bi bi-window-plus"></i> Onglets
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" (click)="openMultipleTabsForFolders(currentFolders)">Ouvrir tous les
-                            dossiers actuels</a></li>
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-                    <li *ngFor="let segment of breadcrumbSegments">
-                        <a class="dropdown-item" (click)="openInNewTab({name: segment.name, path: segment.path})">
-                            {{ segment.name }}
-                        </a>
-                    </li>
-                </ul>
+                <!-- Bouton pour ouvrir plusieurs onglets -->
+                <div class="btn-group ms-3" *ngIf="!isFilterExpanded">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-window-plus"></i> Onglets
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" (click)="openMultipleTabsForFolders(currentFolders)">Ouvrir tous
+                                les
+                                dossiers actuels</a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li *ngFor="let segment of breadcrumbSegments">
+                            <a class="dropdown-item" (click)="openInNewTab({name: segment.name, path: segment.path})">
+                                {{ segment.name }}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
-        <!-- Contrôles de navigation géographique -->
-        <div class="location-controls ms-3" *ngIf="navigationMode === 'location' && currentPath !== '/Archives'">
-            <div class="row">
-                <div class="col-md-4 mb-2">
-                    <select class="form-select form-select-sm" [ngModel]="selectedRegion?.id"
-                        (ngModelChange)="onRegionChange($event)">
-                        <option [ngValue]="null">Sélectionner une région</option>
-                        <option *ngFor="let region of availableRegions" [ngValue]="region.id">{{ region.nom }}</option>
-                    </select>
-                </div>
-                <div class="col-md-4 mb-2">
-                    <select class="form-select form-select-sm" [disabled]="!selectedRegion"
-                        [ngModel]="selectedCercle?.id" (ngModelChange)="onCercleChange($event)">
-                        <option [ngValue]="null">Sélectionner un cercle</option>
-                        <option *ngFor="let cercle of availableCercles" [ngValue]="cercle.id">{{ cercle.nom }}</option>
-                    </select>
-                </div>
-                <div class="col-md-4 mb-2">
-                    <select class="form-select form-select-sm" [disabled]="!selectedCercle"
-                        [ngModel]="selectedCommune?.id" (ngModelChange)="onCommuneChange($event)">
-                        <option [ngValue]="null">Sélectionner une commune</option>
-                        <option *ngFor="let commune of availableCommunes" [ngValue]="commune.id">{{ commune.nom }}
-                        </option>
-                    </select>
-                </div>
 
-                <div class="col-md-4 mb-2"
-                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Centre d\'état civil')">
-                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
-                        [ngModel]="selectedCentre?.id" (ngModelChange)="onCentreChange($event, 'etatCivil')">
-                        <option [ngValue]="null">Sélectionner un centre d'état civil</option>
-                        <option *ngFor="let centre of availableCentresEtatCivil" [ngValue]="centre.id">{{ centre.nom }}
-                        </option>
-                    </select>
-                </div>
-
-                <div class="col-md-4 mb-2"
-                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Centre de déclaration')">
-                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
-                        [ngModel]="selectedCentre?.id" (ngModelChange)="onCentreChange($event, 'declaration')">
-                        <option [ngValue]="null">Sélectionner un centre de déclaration</option>
-                        <option *ngFor="let centre of availableCentresDeclaration" [ngValue]="centre.id">{{ centre.nom
-                            }}</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4 mb-2"
-                    *ngIf="selectedCommune && selectedCercle && currentPath.includes('Tribunal')">
-                    <select class="form-select form-select-sm" [disabled]="!selectedCommune"
-                        [ngModel]="selectedTribunal?.id" (ngModelChange)="onTribunalChange($event)">
-                        <option [ngValue]="null">Sélectionner un tribunal</option>
-                        <option *ngFor="let tribunal of availableTribunaux" [ngValue]="tribunal.id">{{ tribunal.nom }}
-                        </option>
-                    </select>
-                </div>
-            </div>
-        </div>
 
         <!-- Filtres avancés -->
-        <app-advanced-filter (filtersChanged)="applyFilters($event)"></app-advanced-filter>
+        <div class="advanced-filter-panel" *ngIf="isFilterExpanded">
+            <app-advanced-filter (filtersChanged)="applyFilters($event)"></app-advanced-filter>
+        </div>
 
         <!-- Chemin de navigation (breadcrumb) -->
         <div class="breadcrumb-container">
@@ -211,8 +213,8 @@
         <!-- Mode navigation -->
         <div class="content-container" *ngIf="!isLoading && !isSearchMode">
             <app-document-list *ngIf="viewMode === 'list'" [folders]="currentFolders" [documents]="currentDocuments"
-                (folderSelected)="openFolder($event)" (folderContextMenu)="openInNewTab($event)"
-                (documentSelected)="openDocument($event)">
+                [isLastLevel]="isAtLastLevel" (folderSelected)="openFolder($event)"
+                (folderContextMenu)="openInNewTab($event)" (documentSelected)="openDocument($event)">
             </app-document-list>
 
             <app-document-grid *ngIf="viewMode === 'grid'" [folders]="currentFolders" [documents]="currentDocuments"

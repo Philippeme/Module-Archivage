@@ -10,6 +10,7 @@ import { DocumentService } from '../../services/document.service';
 export class DocumentGridComponent {
   @Input() folders: Folder[] = [];
   @Input() documents: Document[] = [];
+  @Input() isLastLevel: boolean = false; // Propriété pour identifier le dernier niveau
   @Output() folderSelected = new EventEmitter<Folder>();
   @Output() folderContextMenu = new EventEmitter<Folder>();
   @Output() documentSelected = new EventEmitter<Document>();
@@ -22,19 +23,15 @@ export class DocumentGridComponent {
 
   onFolderRightClick(folder: Folder, event: MouseEvent): void {
     event.preventDefault();
-    // Afficher un menu contextuel personnalisé
+    // Afficher un menu contextuel simple pour l'ouverture dans un nouvel onglet uniquement
     const menuItems = [
-      { label: 'Ouvrir dans un nouvel onglet', action: 'newtab' },
-      { label: 'Voir les détails', action: 'details' }
+      { label: 'Ouvrir dans un nouvel onglet', action: 'newtab' }
     ];
     
     // Créer et positionner le menu contextuel
     this.createContextMenu(event, menuItems, (action: string) => {
       if (action === 'newtab') {
         this.folderContextMenu.emit(folder);
-      } else if (action === 'details') {
-        // Pour une future implémentation
-        console.log('Afficher les détails de', folder.name);
       }
     });
   }

@@ -1,5 +1,37 @@
+<!-- src/app/components/document-list/document-list.component.html -->
 <div class="document-list">
-    <table class="table table-hover">
+    <!-- Liste des documents pour le dernier niveau -->
+    <div *ngIf="isLastLevel" class="document-list-direct">
+        <div class="row document-cards">
+            <div *ngFor="let document of documents" class="col-md-4 col-lg-3 mb-3">
+                <div class="card document-card" (click)="onDocumentClick(document)">
+                    <div class="card-body">
+                        <div class="document-icon">
+                            <i class="bi bi-file-pdf-fill text-danger"></i>
+                        </div>
+                        <h6 class="card-title document-name">{{ document.originalName }}</h6>
+                        <p class="card-text document-date">
+                            {{ document.creationDate | date:'dd/MM/yyyy' }}
+                        </p>
+                        <div class="document-actions">
+                            <button class="btn btn-sm btn-outline-primary" (click)="downloadDocument(document, $event)" title="Télécharger">
+                                <i class="bi bi-download"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-info ms-1" (click)="openDocument(document, $event)" title="Prévisualiser">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success ms-1" (click)="shareDocument(document, $event)" title="Partager">
+                                <i class="bi bi-share"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vue Liste standard pour les niveaux intermédiaires -->
+    <table class="table table-hover" *ngIf="!isLastLevel">
         <thead>
             <tr>
                 <th>Nom</th>
@@ -28,14 +60,15 @@
                 <td>
                     <div class="actions">
                         <button class="btn btn-sm btn-outline-secondary"
-                            (click)="$event.stopPropagation(); onFolderRightClick(folder, $event)">
+                            (click)="$event.stopPropagation(); onFolderRightClick(folder, $event)" 
+                            title="Ouvrir dans un nouvel onglet">
                             <i class="bi bi-box-arrow-up-right"></i>
                         </button>
                     </div>
                 </td>
             </tr>
 
-            <!-- Documents (ajout des boutons d'action) -->
+            <!-- Documents -->
             <tr *ngFor="let document of documents" class="document-row">
                 <td (click)="onDocumentClick(document)">
                     <i class="bi bi-file-pdf-fill me-2 text-danger"></i>
@@ -48,13 +81,13 @@
                 <td (click)="onDocumentClick(document)">{{ document.size | number }} Ko</td>
                 <td>
                     <div class="actions">
-                        <button class="btn btn-sm btn-outline-primary" (click)="downloadDocument(document, $event)">
+                        <button class="btn btn-sm btn-outline-primary" (click)="downloadDocument(document, $event)" title="Télécharger">
                             <i class="bi bi-download"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-info ms-1" (click)="openDocument(document, $event)">
+                        <button class="btn btn-sm btn-outline-info ms-1" (click)="openDocument(document, $event)" title="Prévisualiser">
                             <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-success ms-1" (click)="shareDocument(document, $event)">
+                        <button class="btn btn-sm btn-outline-success ms-1" (click)="shareDocument(document, $event)" title="Partager">
                             <i class="bi bi-share"></i>
                         </button>
                     </div>

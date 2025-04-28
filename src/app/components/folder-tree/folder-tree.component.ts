@@ -1,3 +1,4 @@
+// src/app/components/folder-tree/folder-tree.component.ts
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { Folder } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
@@ -8,7 +9,7 @@ import { DocumentService } from '../../services/document.service';
   styleUrls: ['./folder-tree.component.scss']
 })
 export class FolderTreeComponent implements OnInit, OnChanges {
-  @Input() navigationMode: 'time' | 'location' = 'time';
+  @Input() navigationMode: 'date' | 'location' = 'date'; // Renommé de 'time' à 'date'
   @Input() currentPath: string = '/Archives';
   @Output() folderSelected = new EventEmitter<Folder>();
   
@@ -41,10 +42,12 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     this.isLoading = true;
     this.documentService.getRootFolders().subscribe({
       next: (folders) => {
+        // Conversion au pluriel des noms de dossiers
         this.rootFolders = folders.map(folder => ({
           ...folder,
-          iconClass: this.documentService.getFolderIcon({ ...folder, type: 'document-type' }),
-          colorClass: this.documentService.getFolderColor({ ...folder, type: 'document-type' })
+          name: this.pluralizeFolderName(folder.name),
+          iconClass: 'bi-folder-fill', // Uniformisation des icônes
+          colorClass: 'text-warning'
         }));
         this.isLoading = false;
         
@@ -56,6 +59,31 @@ export class FolderTreeComponent implements OnInit, OnChanges {
         this.isLoading = false;
       }
     });
+  }
+
+  // Méthode pour convertir les noms de dossiers au pluriel
+  pluralizeFolderName(name: string): string {
+    // Vérifier si le nom est déjà au pluriel
+    if (name.endsWith('s')) return name;
+    
+    // Cas spéciaux
+    if (name === 'Acte de naissance') return 'Actes de naissance';
+    if (name === 'Acte de mariage') return 'Actes de mariage';
+    if (name === 'Acte de décès') return 'Actes de décès';
+    if (name === 'Déclaration de naissance') return 'Déclarations de naissance';
+    if (name === 'Déclaration de décès') return 'Déclarations de décès';
+    if (name === 'Certificat de décès') return 'Certificats de décès';
+    if (name === 'Publication de mariage') return 'Publications de mariage';
+    if (name === 'Certificat de non opposition') return 'Certificats de non opposition';
+    if (name === 'Fiche de non inscription') return 'Fiches de non inscription';
+    if (name === 'Jugement supplétif') return 'Jugements supplétifs';
+    if (name === 'Jugement rectificatif') return 'Jugements rectificatifs';
+    if (name === 'Jugement d\'annulation') return 'Jugements d\'annulation';
+    if (name === 'Jugement d\'homologation') return 'Jugements d\'homologation';
+    if (name === 'Jugement déclaratif') return 'Jugements déclaratifs';
+    
+    // Cas général
+    return name + 's';
   }
 
   expandPathToCurrentFolder(): void {
@@ -90,8 +118,8 @@ export class FolderTreeComponent implements OnInit, OnChanges {
       next: (folders) => {
         this.loadedFolders[path] = folders.map(folder => ({
           ...folder,
-          iconClass: this.documentService.getFolderIcon(folder),
-          colorClass: this.documentService.getFolderColor(folder)
+          iconClass: this.getIconByType(folder.type), // Utiliser des icônes spécifiques par type
+          colorClass: this.getColorByType(folder.type)
         }));
         this.isLoading = false;
       },
@@ -100,6 +128,32 @@ export class FolderTreeComponent implements OnInit, OnChanges {
         this.isLoading = false;
       }
     });
+  }
+
+  getIconByType(type: string): string {
+    switch(type) {
+      case 'year': return 'bi-calendar-year';
+      case 'month': return 'bi-calendar-month';
+      case 'day': return 'bi-calendar-day';
+      case 'region': return 'bi-geo-alt';
+      case 'circle': return 'bi-circle';
+      case 'commune': return 'bi-building';
+      case 'center': return 'bi-house-door';
+      default: return 'bi-folder-fill';
+    }
+  }
+
+  getColorByType(type: string): string {
+    switch(type) {
+      case 'year': return 'text-primary';
+      case 'month': return 'text-success';
+      case 'day': return 'text-info';
+      case 'region': return 'text-danger';
+      case 'circle': return 'text-warning';
+      case 'commune': return 'text-purple';
+      case 'center': return 'text-teal';
+      default: return 'text-warning';
+    }
   }
 
   toggleFolder(folder: Folder, event: Event): void {

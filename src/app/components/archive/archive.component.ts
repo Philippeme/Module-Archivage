@@ -2,14 +2,16 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
 import { Document, Folder, DocumentType } from '../../models/document.model';
-import { FilterCriteria } from '../../models/filter.model';
+import { FilterCriteria, SavedFilter } from '../../models/filter.model';
 import { DocumentService } from '../../services/document.service';
 import { FilterService } from '../../services/filter.service';
 import { PermissionService } from '../../services/permission.service';
 import { PermissionType } from '../../models/permission.model';
 import { DatabaseService } from '../../services/database.service';
+import { SaveFilterDialogComponent } from '../save-filter-dialog/save-filter-dialog.component';
 
 @Component({
   selector: 'app-archive',
@@ -18,7 +20,7 @@ import { DatabaseService } from '../../services/database.service';
 })
 export class ArchiveComponent implements OnInit, OnDestroy {
   viewMode: 'list' | 'grid' = 'list';
-  navigationMode: 'time' | 'location' = 'time';
+  navigationMode: 'date' | 'location' = 'date'; // Renommé de 'time' à 'date'
   currentPath: string = '/Archives';
   sidebarMode: 'tree' | 'quick' = 'tree';
   breadcrumbSegments: { name: string; path: string }[] = [
@@ -29,13 +31,17 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   selectedDocument: Document | null = null;
   isLoading = false;
   errorMessage = '';
+  successMessage = '';
   navigationHistory: string[] = ['/Archives'];
   historyIndex = 0;
+  isAtLastLevel = false;
 
   // Propriétés pour la recherche et le filtrage
   isSearchMode = false;
   searchTerm = '';
   currentFilter: FilterCriteria | null = null;
+  isFilterExpanded = false;
+  savedFilters: SavedFilter[] = [];
 
   // Propriétés pour la navigation géographique
   documentTypes = Object.values(DocumentType);
@@ -60,7 +66,8 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     private location: Location,
     private filterService: FilterService,
     private permissionService: PermissionService,
-    private databaseService: DatabaseService
+    private databaseService: DatabaseService,
+    private dialog: MatDialog
   ) { }
 
   ngOnInit(): void {
@@ -89,7 +96,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       }
 
       if (params['mode']) {
-        this.navigationMode = params['mode'] as 'time' | 'location';
+        this.navigationMode = params['mode'] as 'date' | 'location';
       }
 
       if (params['search']) {
@@ -103,6 +110,9 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     // Charger les régions disponibles
     this.loadRegions();
+    
+    // Charger les filtres sauvegardés
+    this.loadSavedFilters();
   }
 
   ngOnDestroy(): void {
@@ -119,7 +129,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     const storedNavigationMode = localStorage.getItem('archiveNavigationMode');
     if (storedNavigationMode) {
-      this.navigationMode = storedNavigationMode as 'time' | 'location';
+      this.navigationMode = storedNavigationMode as 'date' | 'location';
     }
 
     const storedSidebarMode = localStorage.getItem('archiveSidebarMode');
@@ -133,6 +143,17 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     localStorage.setItem('archiveViewMode', this.viewMode);
     localStorage.setItem('archiveNavigationMode', this.navigationMode);
     localStorage.setItem('archiveSidebarMode', this.sidebarMode);
+  }
+
+  loadSavedFilters(): void {
+    this.filterService.getSavedFilters().subscribe({
+      next: (filters) => {
+        this.savedFilters = filters;
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des filtres sauvegardés', error);
+      }
+    });
   }
 
   loadRegions(): void {
@@ -285,6 +306,16 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     // Analyser le chemin pour déterminer quels éléments doivent être chargés
     const pathParts = cleanedPath.split('/').filter(part => part !== '');
 
+    // Déterminer si nous sommes au dernier niveau (pour le tri par date)
+    let isLastLevel = false;
+    if (this.navigationMode === 'date' && pathParts.length === 5) {
+      // Pour le tri par date, le dernier niveau est: /Archives/Type/Année/Mois/Jour/
+      isLastLevel = true;
+    } else if (this.navigationMode === 'location' && pathParts.length >= 7) {
+      // Pour le tri par lieu, le dernier niveau est après le centre spécifique
+      isLastLevel = true;
+    }
+
     // Si nous sommes à la racine
     if (pathParts.length <= 1) {
       // Afficher les types de documents (racine)
@@ -293,6 +324,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
           this.currentFolders = folders;
           this.currentDocuments = [];
           this.isLoading = false;
+          this.isAtLastLevel = isLastLevel;
         },
         error: (error) => {
           console.error('Error loading root folders', error);
@@ -306,38 +338,47 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     // Récupérer le type de document (premier élément après "Archives")
     const documentType = pathParts[1];
 
-    if (this.navigationMode === 'time') {
-      // Navigation par temps
+    if (this.navigationMode === 'date') {
+      // Navigation par date
       if (pathParts.length === 2) {
         // Niveau des années
         this.loadYearFolders(documentType);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 3) {
         // Niveau des mois
         this.loadMonthFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 4) {
         // Niveau des jours
         this.loadDayFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 5) {
         // Niveau des documents pour un jour spécifique
         this.loadDocumentsByPath(cleanedPath);
+        this.isAtLastLevel = true;
       }
     } else {
       // Navigation par lieu
       if (pathParts.length === 2) {
         // Niveau des régions
         this.loadRegionFolders(documentType);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 3) {
         // Niveau des cercles pour une région
         this.loadCircleFolders(`/Archives/${documentType}/${pathParts[2]}/`);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 4) {
         // Niveau des communes pour un cercle
         this.loadCommuneFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/`);
+        this.isAtLastLevel = false;
       } else if (pathParts.length === 5) {
         // Niveau des centres pour une commune
         this.loadCentreFolders(`/Archives/${documentType}/${pathParts[2]}/${pathParts[3]}/${pathParts[4]}/`);
+        this.isAtLastLevel = false;
       } else if (pathParts.length >= 6) {
         // Niveau des documents pour un centre spécifique
         this.loadDocumentsByPath(cleanedPath);
+        this.isAtLastLevel = true;
       }
     }
   }
@@ -699,7 +740,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     this.saveUserPreferences();
   }
 
-  setNavigationMode(mode: 'time' | 'location'): void {
+  setNavigationMode(mode: 'date' | 'location'): void {
     if (this.currentPath === '/Archives') {
       return; // Ne pas changer le mode si nous sommes à la racine
     }
@@ -734,6 +775,10 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   setSidebarMode(mode: 'tree' | 'quick'): void {
     this.sidebarMode = mode;
     this.saveUserPreferences();
+  }
+
+  toggleFilterPanel(): void {
+    this.isFilterExpanded = !this.isFilterExpanded;
   }
 
   openDocument(document: Document): void {
@@ -783,6 +828,11 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       // Si nous sommes en mode recherche, revenir en mode navigation
       if (this.isSearchMode) {
         this.isSearchMode = false;
+      }
+
+      // Si nous sommes en mode filtres avancés, fermer le panneau
+      if (this.isFilterExpanded) {
+        this.isFilterExpanded = false;
       }
 
       this.loadFolderContent();
@@ -922,6 +972,92 @@ export class ArchiveComponent implements OnInit, OnDestroy {
       // Si le terme est vide, revenir en mode navigation
       this.isSearchMode = false;
       this.loadFolderContent();
+    }
+  }
+
+  saveCurrentFilter(): void {
+    // Ouvrir la boîte de dialogue de sauvegarde
+    const dialogRef = this.dialog.open(SaveFilterDialogComponent, {
+      width: '400px',
+      data: {
+        filter: {
+          criteria: this.currentFilter || {}
+        },
+        existingFilters: this.savedFilters
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.isLoading = true;
+        this.filterService.saveFilter(
+          { criteria: this.currentFilter || {} },
+          result.name,
+          result.description
+        ).subscribe({
+          next: (savedFilter) => {
+            this.savedFilters = [...this.savedFilters.filter(f => f.id !== savedFilter.id), savedFilter];
+            this.isLoading = false;
+            // Afficher un message de confirmation
+            this.successMessage = `Filtre "${result.name}" sauvegardé avec succès`;
+            setTimeout(() => this.successMessage = '', 3000);
+          },
+          error: (error) => {
+            console.error('Erreur lors de la sauvegarde du filtre', error);
+            this.isLoading = false;
+            this.errorMessage = `Erreur lors de la sauvegarde du filtre: ${error.message}`;
+            setTimeout(() => this.errorMessage = '', 3000);
+          }
+        });
+      }
+    });
+  }
+
+  resetFilters(): void {
+    this.filterService.resetFilter();
+    // Fermer le panneau des filtres avancés
+    this.isFilterExpanded = false;
+  }
+
+  loadFilter(filterId: string): void {
+    this.filterService.loadFilter(filterId).subscribe({
+      next: (filter) => {
+        // Appliquer les filtres
+        this.applyFilters(filter.criteria);
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement du filtre', error);
+        this.errorMessage = `Erreur lors du chargement du filtre: ${error.message}`;
+      }
+    });
+  }
+
+  setDefaultFilter(filterId: string): void {
+    this.filterService.setDefaultFilter(filterId).subscribe({
+      next: () => {
+        // Mettre à jour les filtres sauvegardés
+        this.loadSavedFilters();
+      },
+      error: (error) => {
+        console.error('Erreur lors de la définition du filtre par défaut', error);
+        this.errorMessage = `Erreur lors de la définition du filtre par défaut: ${error.message}`;
+      }
+    });
+  }
+
+  deleteFilter(filterId: string, event: Event): void {
+    event.stopPropagation();
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce filtre ?')) {
+      this.filterService.deleteFilter(filterId).subscribe({
+        next: () => {
+          // Mettre à jour les filtres sauvegardés
+          this.loadSavedFilters();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la suppression du filtre', error);
+          this.errorMessage = `Erreur lors de la suppression du filtre: ${error.message}`;
+        }
+      });
     }
   }
 }

@@ -1,3 +1,4 @@
+// src/app/components/document-preview/document-preview.component.ts
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { Document, ActionType } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
@@ -13,17 +14,14 @@ export class DocumentPreviewComponent implements OnChanges {
   @Input() document: Document | null = null;
   @Output() close = new EventEmitter<void>();
 
-  documentVersions: Document[] = [];
   selectedVersion: Document | null = null;
   pdfUrl: SafeResourceUrl | null = null;
   isLoading = false;
   errorMessage = '';
 
-  activeTab: 'info' | 'comments' | 'history' = 'info';
-  showComparisonView = false;
   isPreviewMode = true; // Pour basculer entre prévisualisation et document complet
-  showShareModal = false;
   shareSuccess = '';
+  showShareModal = false;
 
   constructor(
     private documentService: DocumentService,
@@ -34,7 +32,6 @@ export class DocumentPreviewComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['document'] && this.document) {
       this.selectedVersion = this.document;
-      this.loadDocumentVersions();
       
       // Charger en mode prévisualisation d'abord
       this.loadDocumentPreview();
@@ -45,23 +42,6 @@ export class DocumentPreviewComponent implements OnChanges {
       // Enregistrer l'action de consultation
       this.documentService.recordDocumentAction(this.document.id, ActionType.VIEW).subscribe();
     }
-  }
-
-  loadDocumentVersions(): void {
-    if (!this.document) return;
-
-    this.isLoading = true;
-    this.documentService.getDocumentVersions(this.document.id).subscribe({
-      next: (versions) => {
-        this.documentVersions = versions;
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading document versions', error);
-        this.errorMessage = 'Erreur lors du chargement des versions du document.';
-        this.isLoading = false;
-      }
-    });
   }
 
   loadDocumentPreview(): void {
@@ -101,11 +81,6 @@ export class DocumentPreviewComponent implements OnChanges {
     }
   }
 
-  selectVersion(version: Document): void {
-    this.selectedVersion = version;
-    this.loadDocumentPreview();
-  }
-
   closePreview(): void {
     // Nettoyer les ressources
     if (this.pdfUrl) {
@@ -127,18 +102,6 @@ export class DocumentPreviewComponent implements OnChanges {
     } else {
       this.favoritesService.addToFavorites(this.selectedVersion);
     }
-  }
-
-  setActiveTab(tab: 'info' | 'comments' | 'history'): void {
-    this.activeTab = tab;
-  }
-
-  openVersionComparison(): void {
-    this.showComparisonView = true;
-  }
-
-  closeVersionComparison(): void {
-    this.showComparisonView = false;
   }
 
   downloadCurrentDocument(): void {
@@ -193,5 +156,14 @@ export class DocumentPreviewComponent implements OnChanges {
     setTimeout(() => {
       this.shareSuccess = '';
     }, 5000);
+  }
+
+  // Méthode pour formater la taille du fichier
+  formatFileSize(size: number): string {
+    if (size === 0) return '0 Ko';
+    const k = 1024;
+    const sizes = ['Octets', 'Ko', 'Mo', 'Go', 'To'];
+    const i = Math.floor(Math.log(size) / Math.log(k));
+    return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }

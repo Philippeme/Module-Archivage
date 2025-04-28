@@ -1,77 +1,76 @@
 .search-bar-container {
-    position: relative;
-    width: 100%;
-    max-width: 800px;
-  }
+  width: 100%;
+  position: relative;
+}
+
+.search-form {
+  position: relative;
+}
+
+.suggestions-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.suggestions-list {
+  padding: 5px 0;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
   
-  .search-form {
-    position: relative;
+  &:hover {
+    background-color: #f8f9fa;
   }
-  
-  .suggestions-container {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background-color: white;
-    border: 1px solid #dee2e6;
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  
-  .spinner-container {
-    display: flex;
-    justify-content: center;
-    padding: 10px;
-  }
-  
-  .suggestions-list {
-    padding: 5px 0;
-  }
-  
-  .suggestion-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    cursor: pointer;
-    
-    &:hover {
-      background-color: #f8f9fa;
-    }
-  }
-  
-  .suggestion-type {
-    margin-right: 12px;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #e9ecef;
-    border-radius: 50%;
-    color: #495057;
-  }
-  
-  .suggestion-content {
-    flex: 1;
-  }
-  
-  .suggestion-text {
-    font-size: 14px;
-    color: #212529;
-  }
-  
-  .suggestion-count {
-    font-size: 12px;
-    color: #6c757d;
-  }
-  
-  .no-suggestions {
-    padding: 10px 12px;
-    color: #6c757d;
-    font-style: italic;
-  }
+}
+
+.suggestion-type {
+  margin-right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e9ecef;
+  border-radius: 50%;
+  color: #495057;
+}
+
+.suggestion-content {
+  flex: 1;
+}
+
+.suggestion-text {
+  font-size: 14px;
+  color: #212529;
+}
+
+.suggestion-count {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.no-suggestions {
+  padding: 10px 12px;
+  color: #6c757d;
+  font-style: italic;
+}

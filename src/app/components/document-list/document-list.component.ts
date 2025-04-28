@@ -1,3 +1,4 @@
+// src/app/components/document-list/document-list.component.ts
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Document, Folder } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
@@ -10,6 +11,7 @@ import { DocumentService } from '../../services/document.service';
 export class DocumentListComponent {
   @Input() folders: Folder[] = [];
   @Input() documents: Document[] = [];
+  @Input() isLastLevel: boolean = false; // Nouvelle propriété pour détecter le dernier niveau
   @Output() folderSelected = new EventEmitter<Folder>();
   @Output() folderContextMenu = new EventEmitter<Folder>();
   @Output() documentSelected = new EventEmitter<Document>();
@@ -22,19 +24,15 @@ export class DocumentListComponent {
 
   onFolderRightClick(folder: Folder, event: MouseEvent): void {
     event.preventDefault();
-    // Afficher un menu contextuel personnalisé
+    // Afficher un menu contextuel simple (juste ouvrir dans un nouvel onglet)
     const menuItems = [
-      { label: 'Ouvrir dans un nouvel onglet', action: 'newtab' },
-      { label: 'Voir les détails', action: 'details' }
+      { label: 'Ouvrir dans un nouvel onglet', action: 'newtab' }
     ];
     
     // Créer et positionner le menu contextuel
     this.createContextMenu(event, menuItems, (action: string) => {
       if (action === 'newtab') {
         this.folderContextMenu.emit(folder);
-      } else if (action === 'details') {
-        // Pour une future implémentation
-        console.log('Afficher les détails de', folder.name);
       }
     });
   }

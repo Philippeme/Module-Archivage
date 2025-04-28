@@ -26,6 +26,7 @@ import { SaveFilterDialogComponent } from './components/save-filter-dialog/save-
 import { SearchBarComponent } from './components/search-bar/search-bar.component';
 import { SearchResultsComponent } from './components/search-results/search-results.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
+import { DocumentStorageDirective } from './directives/document-storage.directive';
 
 // Import du nouveau service
 import { DatabaseService } from './services/database.service';
@@ -51,7 +52,8 @@ import { DatabaseService } from './services/database.service';
     AdvancedFilterComponent,
     SaveFilterDialogComponent,
     SearchBarComponent,
-    SearchResultsComponent
+    SearchResultsComponent,
+    DocumentStorageDirective
   ],
   imports: [
     BrowserModule,

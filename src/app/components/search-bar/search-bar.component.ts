@@ -42,7 +42,7 @@ export class SearchBarComponent implements OnInit, OnDestroy {
       debounceTime(500),
       distinctUntilChanged()
     ).subscribe(term => {
-      this.search.emit(term || '');
+      // Ne pas émettre sur chaque changement, seulement au submit
     });
   }
 

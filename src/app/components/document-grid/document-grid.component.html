@@ -1,46 +1,76 @@
 <div class="document-grid">
-  <!-- Dossiers avec attribut data-folder-type -->
-  <div *ngFor="let folder of folders" 
-       class="grid-item folder" 
-       [attr.data-folder-type]="folder.type"
-       (click)="onFolderClick(folder)"
-       (contextmenu)="onFolderRightClick(folder, $event)">
-    <div class="icon-container">
-      <i class="bi" [ngClass]="folder.iconClass || 'bi-folder-fill'" [class]="folder.colorClass || 'text-warning'"></i>
-    </div>
-    <div class="item-name">{{ folder.name }}</div>
-    <div class="item-details">
-      {{ folder.lastModificationDate | date:'dd/MM/yyyy' }}
-    </div>
-    <div class="item-actions">
-      <button class="btn btn-sm btn-outline-secondary" (click)="$event.stopPropagation(); onFolderRightClick(folder, $event)">
-        <i class="bi bi-box-arrow-up-right"></i>
-      </button>
-    </div>
-  </div>
-
-    <!-- Documents -->
+  <!-- Affichage spécial pour le dernier niveau (documents uniquement) -->
+  <ng-container *ngIf="isLastLevel; else standardGrid">
     <div *ngFor="let document of documents" class="grid-item document" (click)="onDocumentClick(document)">
+      <div class="document-card">
         <div class="icon-container">
-            <i class="bi bi-file-pdf-fill text-danger"></i>
+          <i class="bi bi-file-pdf-fill text-danger"></i>
         </div>
         <div class="item-name">{{ document.originalName }}</div>
         <div class="item-details">
-            {{ document.lastModificationDate | date:'dd/MM/yyyy' }}
+          {{ document.creationDate | date:'dd/MM/yyyy' }}
         </div>
         <div class="item-actions">
-            <button class="btn btn-sm btn-outline-primary"
-                (click)="$event.stopPropagation(); downloadDocument(document, $event)">
-                <i class="bi bi-download"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-info ms-1"
-                (click)="$event.stopPropagation(); openDocument(document, $event)">
-                <i class="bi bi-eye"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-success ms-1"
-                (click)="$event.stopPropagation(); shareDocument(document, $event)">
-                <i class="bi bi-share"></i>
-            </button>
+          <button class="btn btn-sm btn-outline-primary" title="Télécharger"
+            (click)="$event.stopPropagation(); downloadDocument(document, $event)">
+            <i class="bi bi-download"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-info ms-1" title="Prévisualiser"
+            (click)="$event.stopPropagation(); openDocument(document, $event)">
+            <i class="bi bi-eye"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-success ms-1" title="Partager"
+            (click)="$event.stopPropagation(); shareDocument(document, $event)">
+            <i class="bi bi-share"></i>
+          </button>
         </div>
+      </div>
     </div>
+  </ng-container>
+
+  <!-- Affichage standard pour les niveaux intermédiaires -->
+  <ng-template #standardGrid>
+    <!-- Dossiers avec attribut data-folder-type -->
+    <div *ngFor="let folder of folders" class="grid-item folder" [attr.data-folder-type]="folder.type"
+      (click)="onFolderClick(folder)" (contextmenu)="onFolderRightClick(folder, $event)">
+      <div class="icon-container">
+        <i class="bi" [ngClass]="folder.iconClass || 'bi-folder-fill'" [class]="folder.colorClass || 'text-warning'"></i>
+      </div>
+      <div class="item-name">{{ folder.name }}</div>
+      <div class="item-details">
+        {{ folder.lastModificationDate | date:'dd/MM/yyyy' }}
+      </div>
+      <div class="item-actions">
+        <button class="btn btn-sm btn-outline-secondary" title="Ouvrir dans un nouvel onglet"
+          (click)="$event.stopPropagation(); onFolderRightClick(folder, $event)">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Documents -->
+    <div *ngFor="let document of documents" class="grid-item document" (click)="onDocumentClick(document)">
+      <div class="icon-container">
+        <i class="bi bi-file-pdf-fill text-danger"></i>
+      </div>
+      <div class="item-name">{{ document.originalName }}</div>
+      <div class="item-details">
+        {{ document.lastModificationDate | date:'dd/MM/yyyy' }}
+      </div>
+      <div class="item-actions">
+        <button class="btn btn-sm btn-outline-primary" title="Télécharger"
+          (click)="$event.stopPropagation(); downloadDocument(document, $event)">
+          <i class="bi bi-download"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-info ms-1" title="Prévisualiser"
+          (click)="$event.stopPropagation(); openDocument(document, $event)">
+          <i class="bi bi-eye"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-success ms-1" title="Partager"
+          (click)="$event.stopPropagation(); shareDocument(document, $event)">
+          <i class="bi bi-share"></i>
+        </button>
+      </div>
+    </div>
+  </ng-template>
 </div>
