@@ -6,8 +6,8 @@ import { DocumentService } from '../services/document.service';
   selector: '[appDocumentStorage]'
 })
 export class DocumentStorageDirective {
-  @Input() documentId: string;
-  @Input() documentType: string;
+    @Input() documentId: string = '';
+    @Input() documentType: string = '';
   
   constructor(
     private el: ElementRef,

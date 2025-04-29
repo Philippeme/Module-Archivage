@@ -290,7 +290,7 @@ export class DocumentService {
  * @param navigationMode Mode de navigation (time ou location)
  * @returns Observable de la liste des dossiers
  */
-  loadFolders(path: string, navigationMode: 'time' | 'location'): Observable<Folder[]> {
+  loadFolders(path: string, navigationMode: 'date' | 'location'): Observable<Folder[]> {
     // Analyser le chemin pour déterminer quel type de dossiers charger
     const pathParts = path.split('/').filter(part => part !== '');
 
@@ -302,7 +302,7 @@ export class DocumentService {
     // Récupérer le type de document (premier élément après "Archives")
     const documentType = pathParts[1];
 
-    if (navigationMode === 'time') {
+    if (navigationMode === 'date') {
       // Navigation par temps
       if (pathParts.length === 2) {
         // Niveau des années

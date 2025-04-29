@@ -130,7 +130,8 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     });
   }
 
-  getIconByType(type: string): string {
+  getIconByType(type: string | undefined): string {
+    if (!type) return 'bi-folder-fill'; // Valeur par défaut
     switch(type) {
       case 'year': return 'bi-calendar-year';
       case 'month': return 'bi-calendar-month';
@@ -143,7 +144,8 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     }
   }
 
-  getColorByType(type: string): string {
+  getColorByType(type: string | undefined): string {
+    if (!type) return 'text-warning'; // Valeur par défaut
     switch(type) {
       case 'year': return 'text-primary';
       case 'month': return 'text-success';

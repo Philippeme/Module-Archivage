@@ -8,7 +8,7 @@ import { DocumentService } from '../../services/document.service';
   styleUrls: ['./shortcuts.component.scss']
 })
 export class ShortcutsComponent implements OnInit {
-  @Input() navigationMode: 'time' | 'location' = 'time';
+  @Input() navigationMode: 'date' | 'location' = 'date';
   @Output() folderSelected = new EventEmitter<Folder>();
   
   rootFolders: Folder[] = [];
@@ -43,7 +43,7 @@ export class ShortcutsComponent implements OnInit {
   }
   
   getQuickFolders(): { title: string, folders: Folder[] }[] {
-    if (this.navigationMode === 'time') {
+    if (this.navigationMode === 'date') {
       return [
         { 
           title: 'Cette année', 
