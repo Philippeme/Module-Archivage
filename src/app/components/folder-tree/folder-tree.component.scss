@@ -47,7 +47,7 @@
   }
   
   .tree-label {
-    margin-left: 17px;
+    margin-left: 20px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -56,7 +56,6 @@
   /* Ajouter cette règle pour créer un décalage supplémentaire pour les sous-menus */
   .tree-children .tree-label {
     margin-left: 14px;
-    /* Marge légèrement plus grande pour les sous-niveaux */
   }
   
   .folder-root {
@@ -64,7 +63,7 @@
   }
   
   .root-icon {
-    font-size: 1.2em; /* Agrandir l'icône Archives */
+    font-size: 1.3em; /* Agrandir l'icône Archives */
   }
   
   .spinner-container {

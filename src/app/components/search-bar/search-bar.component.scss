@@ -45,14 +45,29 @@
 
 .suggestion-type {
   margin-right: 12px;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #e9ecef;
   border-radius: 50%;
-  color: #495057;
+  color: white;
+  
+  &.type-document {
+    background-color: #0d6efd;
+  }
+  
+  &.type-person {
+    background-color: #198754;
+  }
+  
+  &.type-location {
+    background-color: #dc3545;
+  }
+  
+  &.type-institution {
+    background-color: #6f42c1;
+  }
 }
 
 .suggestion-content {

@@ -11,6 +11,7 @@
         placeholder="Rechercher des documents..."
         (focus)="onFocus()"
         (blur)="onBlur()"
+        autocomplete="off"
       />
       <button
         *ngIf="searchControl.value"
@@ -40,7 +41,12 @@
           class="suggestion-item"
           (click)="selectSuggestion(suggestion)"
         >
-          <div class="suggestion-type">
+          <div class="suggestion-type" [ngClass]="{
+            'type-document': suggestion.type === 'document',
+            'type-person': suggestion.type === 'person',
+            'type-location': suggestion.type === 'location',
+            'type-institution': suggestion.type === 'institution'
+          }">
             <i class="bi" [ngClass]="{
               'bi-file-text': suggestion.type === 'document',
               'bi-person': suggestion.type === 'person',

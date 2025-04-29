@@ -1,4 +1,3 @@
-// src/app/components/document-preview/document-preview.component.ts
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { Document, ActionType } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
@@ -32,7 +31,7 @@ export class DocumentPreviewComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['document'] && this.document) {
       this.selectedVersion = this.document;
-      
+
       // Charger en mode prévisualisation d'abord
       this.loadDocumentPreview();
 

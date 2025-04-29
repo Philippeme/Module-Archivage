@@ -1,4 +1,3 @@
-// src/app/components/folder-tree/folder-tree.component.ts
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { Folder } from '../../models/document.model';
 import { DocumentService } from '../../services/document.service';
@@ -9,7 +8,7 @@ import { DocumentService } from '../../services/document.service';
   styleUrls: ['./folder-tree.component.scss']
 })
 export class FolderTreeComponent implements OnInit, OnChanges {
-  @Input() navigationMode: 'date' | 'location' = 'date'; // Renommé de 'time' à 'date'
+  @Input() navigationMode: 'date' | 'location' = 'date';
   @Input() currentPath: string = '/Archives';
   @Output() folderSelected = new EventEmitter<Folder>();
   
@@ -118,7 +117,7 @@ export class FolderTreeComponent implements OnInit, OnChanges {
       next: (folders) => {
         this.loadedFolders[path] = folders.map(folder => ({
           ...folder,
-          iconClass: this.getIconByType(folder.type), // Utiliser des icônes spécifiques par type
+          iconClass: this.getIconByType(folder.type),
           colorClass: this.getColorByType(folder.type)
         }));
         this.isLoading = false;
@@ -158,6 +157,24 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     }
   }
 
+  // Nouvelle méthode qui combine à la fois la sélection et le toggle
+  toggleAndSelectFolder(folder: Folder, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Inverser l'état d'expansion
+    this.expandedFolders[folder.path] = !this.expandedFolders[folder.path];
+    
+    // Charger les sous-dossiers si le dossier est développé et que les sous-dossiers ne sont pas encore chargés
+    if (this.expandedFolders[folder.path] && !this.loadedFolders[folder.path]) {
+      this.loadSubfolders(folder.path);
+    }
+    
+    // Émettre l'événement de sélection
+    this.folderSelected.emit(folder);
+  }
+
+  // Conservons ces méthodes pour le cas où elles seraient appelées ailleurs
   toggleFolder(folder: Folder, event: Event): void {
     event.preventDefault();
     event.stopPropagation();

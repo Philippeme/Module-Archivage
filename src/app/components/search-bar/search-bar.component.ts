@@ -26,7 +26,7 @@ export class SearchBarComponent implements OnInit, OnDestroy {
     // Configurer l'auto-suggestion
     this.suggestions$ = this.searchControl.valueChanges.pipe(
       takeUntil(this.destroy$),
-      debounceTime(300),
+      debounceTime(200), // Réduire le délai pour une expérience plus réactive
       distinctUntilChanged(),
       filter(term => !!term && term.length >= 2),
       tap(() => this.isLoading = true),
@@ -36,13 +36,15 @@ export class SearchBarComponent implements OnInit, OnDestroy {
       ))
     );
     
-    // Gérer la soumission de la recherche
+    // Également émettre la recherche après un délai
     this.searchControl.valueChanges.pipe(
       takeUntil(this.destroy$),
-      debounceTime(500),
+      debounceTime(700), // Délai suffisant pour que l'utilisateur finisse de taper
       distinctUntilChanged()
     ).subscribe(term => {
-      // Ne pas émettre sur chaque changement, seulement au submit
+      if (term && term.length >= 3) {
+        this.search.emit(term);
+      }
     });
   }
 

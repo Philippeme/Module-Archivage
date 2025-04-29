@@ -1,11 +1,11 @@
-<!-- src/app/components/document-preview/document-preview.component.html -->
 <div class="document-preview-overlay" *ngIf="document">
     <div class="document-preview-container">
         <div class="document-preview-header">
             <h5 class="mb-0">
                 {{ selectedVersion?.originalName }}
                 <ng-container *ngIf="selectedVersion">
-                    <span class="badge bg-secondary ms-2" *ngIf="selectedVersion.version > 1">v{{ selectedVersion.version }}</span>
+                    <span class="badge bg-secondary ms-2" *ngIf="selectedVersion.version > 1">v{{
+                        selectedVersion.version }}</span>
                 </ng-container>
             </h5>
             <div class="document-preview-actions">
@@ -80,8 +80,21 @@
                                 <td>{{ formatFileSize(selectedVersion?.size || 0) }}</td>
                             </tr>
                             <tr>
+                                <th scope="row">Format</th>
+                                <td>PDF</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Statut</th>
+                                <td>{{ selectedVersion?.deleted ? 'Supprimé' : 'Actif' }}</td>
+                            </tr>
+                            <tr>
                                 <th scope="row">Chemin</th>
-                                <td class="text-truncate" style="max-width: 200px;" title="{{ selectedVersion?.path }}">{{ selectedVersion?.path }}</td>
+                                <td class="text-truncate" style="max-width: 200px;" title="{{ selectedVersion?.path }}">
+                                    {{ selectedVersion?.path }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">ID</th>
+                                <td>{{ selectedVersion?.id }}</td>
                             </tr>
                         </tbody>
                     </table>

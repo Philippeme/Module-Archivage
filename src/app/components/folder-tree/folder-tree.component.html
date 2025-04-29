@@ -1,10 +1,9 @@
-<!-- src/app/components/folder-tree/folder-tree.component.html -->
 <div class="folder-tree">
   <ul class="tree-root">
     <li>
       <div class="tree-item" [class.active]="currentPath === '/Archives'"
-        (click)="selectFolder({name: 'Archives', path: '/Archives'}, $event)">
-        <span class="tree-toggle" (click)="toggleFolder({name: 'Archives', path: '/Archives'}, $event)">
+        (click)="toggleAndSelectFolder({name: 'Archives', path: '/Archives'}, $event)">
+        <span class="tree-toggle">
           <i class="bi"
             [ngClass]="{'bi-caret-right-fill': !isFolderExpanded({name: 'Archives', path: '/Archives'}), 'bi-caret-down-fill': isFolderExpanded({name: 'Archives', path: '/Archives'})}"></i>
           <i class="bi bi-archive-fill root-icon text-warning ms-1"></i>
@@ -14,12 +13,11 @@
 
       <ul class="tree-children" *ngIf="isFolderExpanded({name: 'Archives', path: '/Archives'})">
         <li *ngFor="let folder of rootFolders">
-          <div class="tree-item" [class.active]="isCurrentFolder(folder)" (click)="selectFolder(folder, $event)">
-            <span class="tree-toggle" (click)="toggleFolder(folder, $event)">
+          <div class="tree-item" [class.active]="isCurrentFolder(folder)" (click)="toggleAndSelectFolder(folder, $event)">
+            <span class="tree-toggle">
               <i class="bi"
                 [ngClass]="{'bi-caret-right-fill': !isFolderExpanded(folder), 'bi-caret-down-fill': isFolderExpanded(folder)}"></i>
-              <i class="bi ms-1" [ngClass]="folder.iconClass || 'bi-folder-fill'"
-                [class]="folder.colorClass || 'text-warning'"></i>
+              <i class="bi bi-folder-fill text-warning ms-1"></i>
             </span>
             <span class="tree-label">{{ folder.name }}</span>
           </div>
@@ -35,8 +33,8 @@
   <ng-template #folderChildren let-folder>
     <ul class="tree-children" *ngIf="getFolderSubfolders(folder).length > 0">
       <li *ngFor="let subfolder of getFolderSubfolders(folder)">
-        <div class="tree-item" [class.active]="isCurrentFolder(subfolder)" (click)="selectFolder(subfolder, $event)">
-          <span class="tree-toggle" (click)="toggleFolder(subfolder, $event)">
+        <div class="tree-item" [class.active]="isCurrentFolder(subfolder)" (click)="toggleAndSelectFolder(subfolder, $event)">
+          <span class="tree-toggle">
             <i class="bi"
               [ngClass]="{'bi-caret-right-fill': !isFolderExpanded(subfolder), 'bi-caret-down-fill': isFolderExpanded(subfolder)}"></i>
             <i class="bi ms-1" [ngClass]="subfolder.iconClass || 'bi-folder-fill'"

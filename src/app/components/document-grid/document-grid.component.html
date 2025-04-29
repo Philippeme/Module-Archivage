@@ -30,7 +30,7 @@
 
   <!-- Affichage standard pour les niveaux intermédiaires -->
   <ng-template #standardGrid>
-    <!-- Dossiers avec attribut data-folder-type -->
+    <!-- Dossiers -->
     <div *ngFor="let folder of folders" class="grid-item folder" [attr.data-folder-type]="folder.type"
       (click)="onFolderClick(folder)" (contextmenu)="onFolderRightClick(folder, $event)">
       <div class="icon-container">

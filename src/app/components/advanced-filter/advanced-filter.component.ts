@@ -1,4 +1,3 @@
-// src/app/components/advanced-filter/advanced-filter.component.ts
 import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -106,7 +105,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       startDate: [null],
       endDate: [null],
       concernedPerson: [''],
-      sourceInstitution: [''],
+      sourceInstitution: [null],
       creator: [''],
       lastModifier: [''],
       logicalOperator: ['AND'],
@@ -191,36 +190,6 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
         this.isLoading = false;
       }
     });
-  }
-
-  setDefaultFilter(filterId: string): void {
-    this.filterService.setDefaultFilter(filterId).subscribe({
-      next: () => {
-        // Mettre à jour l'interface pour refléter le changement
-        this.savedFilters = this.savedFilters.map(f => ({
-          ...f,
-          isDefault: f.id === filterId
-        }));
-      },
-      error: (error) => {
-        console.error('Erreur lors de la définition du filtre par défaut', error);
-      }
-    });
-  }
-
-  deleteFilter(filterId: string, event: Event): void {
-    event.stopPropagation();
-
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce filtre?')) {
-      this.filterService.deleteFilter(filterId).subscribe({
-        next: () => {
-          this.savedFilters = this.savedFilters.filter(f => f.id !== filterId);
-        },
-        error: (error) => {
-          console.error('Erreur lors de la suppression du filtre', error);
-        }
-      });
-    }
   }
 
   saveFilter(): void {

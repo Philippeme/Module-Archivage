@@ -1110,14 +1110,7 @@ export class DocumentService {
   getFolderIcon(folder: Folder): string {
     switch (folder.type) {
       case 'document-type':
-        // Icône spécifique selon le type de document
-        if (folder.name.includes('mariage')) return 'bi-heart-fill';
-        if (folder.name.includes('naissance')) return 'bi-person-plus-fill';
-        if (folder.name.includes('décès')) return 'bi-person-dash-fill';
-        if (folder.name.includes('jugement')) return 'bi-gavel';
-        if (folder.name.includes('certificat')) return 'bi-patch-check-fill';
-        if (folder.name.includes('fiche')) return 'bi-file-earmark-text-fill';
-        if (folder.name.includes('publication')) return 'bi-megaphone-fill';
+        
         return 'bi-folder-fill';
       case 'year':
         return 'bi-calendar-year';
@@ -1142,14 +1135,7 @@ export class DocumentService {
   getFolderColor(folder: Folder): string {
     switch (folder.type) {
       case 'document-type':
-        // Couleur spécifique selon le type de document
-        if (folder.name.includes('mariage')) return 'text-danger';
-        if (folder.name.includes('naissance')) return 'text-success';
-        if (folder.name.includes('décès')) return 'text-secondary';
-        if (folder.name.includes('jugement')) return 'text-info';
-        if (folder.name.includes('certificat')) return 'text-primary';
-        if (folder.name.includes('fiche')) return 'text-teal';
-        if (folder.name.includes('publication')) return 'text-purple';
+    
         return 'text-warning';
       case 'year':
         return 'text-primary';

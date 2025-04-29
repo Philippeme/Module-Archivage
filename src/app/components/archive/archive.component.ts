@@ -57,6 +57,38 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   availableTribunaux: any[] = [];
   selectedTribunal: any = null;
 
+  // Mini-filtres pour la sélection combinée
+  showYearFilter = false;
+  showMonthFilter = false;
+  showDayFilter = false;
+  showRegionFilter = false;
+  showCercleFilter = false;
+  showCommuneFilter = false;
+
+  // Valeurs sélectionnées
+  selectedYear: number | null = null;
+  selectedMonth: number | null = null;
+  selectedDay: number | null = null;
+
+
+  // Options disponibles
+  availableYears: number[] = [];
+  availableMonths = [
+    { value: 1, label: 'Janvier' },
+    { value: 2, label: 'Février' },
+    { value: 3, label: 'Mars' },
+    { value: 4, label: 'Avril' },
+    { value: 5, label: 'Mai' },
+    { value: 6, label: 'Juin' },
+    { value: 7, label: 'Juillet' },
+    { value: 8, label: 'Août' },
+    { value: 9, label: 'Septembre' },
+    { value: 10, label: 'Octobre' },
+    { value: 11, label: 'Novembre' },
+    { value: 12, label: 'Décembre' }
+  ];
+  availableDays: number[] = [];
+
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -110,7 +142,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     // Charger les régions disponibles
     this.loadRegions();
-    
+
     // Charger les filtres sauvegardés
     this.loadSavedFilters();
   }
@@ -119,6 +151,206 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+  // Ajouter dans le ngOnInit ou une autre méthode appropriée
+  loadRegionsForFilters(): void {
+    this.databaseService.getRegions().subscribe({
+      next: (regions) => {
+        this.availableRegions = regions;
+        this.updateFilterVisibility();
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des régions', error);
+      }
+    });
+  }
+
+  loadYearsForFilters(documentType: string): void {
+    this.databaseService.getYearsByDocumentType(documentType).subscribe({
+      next: (years) => {
+        this.availableYears = years;
+        this.updateFilterVisibility();
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des années', error);
+      }
+    });
+  }
+
+  // Méthodes pour les mini-filtres
+  updateFilterVisibility(): void {
+    // Analyser le chemin courant pour déterminer quels filtres afficher
+    const pathParts = this.currentPath.split('/').filter(part => part !== '');
+
+    if (pathParts.length <= 1) {
+      this.resetFilterVisibility();
+      return;
+    }
+
+    const documentType = pathParts[1];
+
+    if (this.navigationMode === 'date') {
+      this.showYearFilter = pathParts.length >= 2;
+      this.showMonthFilter = pathParts.length >= 3;
+      this.showDayFilter = pathParts.length >= 4;
+
+      // Charger les données nécessaires
+      if (this.showYearFilter && this.availableYears.length === 0) {
+        this.loadYearsForFilters(documentType);
+      }
+
+      if (this.showMonthFilter && pathParts.length >= 3) {
+        const year = parseInt(pathParts[2], 10);
+        this.selectedYear = year;
+        this.loadMonthsForYear(documentType, year);
+      }
+
+      if (this.showDayFilter && pathParts.length >= 4) {
+        const year = parseInt(pathParts[2], 10);
+        const month = parseInt(pathParts[3], 10);
+        this.selectedMonth = month;
+        this.loadDaysForMonth(documentType, year, month);
+      }
+    } else {
+      this.showRegionFilter = pathParts.length >= 2;
+      this.showCercleFilter = pathParts.length >= 3;
+      this.showCommuneFilter = pathParts.length >= 4;
+
+      // Charger les données nécessaires
+      if (this.showRegionFilter && this.availableRegions.length === 0) {
+        this.loadRegionsForFilters();
+      }
+
+      if (this.showCercleFilter && pathParts.length >= 3) {
+        const regionName = pathParts[2];
+        const region = this.availableRegions.find(r => r.nom === regionName);
+        if (region) {
+          this.selectedRegion = region;
+          this.loadCerclesForRegion(region.id);
+        }
+      }
+
+      if (this.showCommuneFilter && pathParts.length >= 4) {
+        const cercleName = pathParts[3];
+        const cercle = this.availableCercles.find(c => c.nom === cercleName);
+        if (cercle) {
+          this.selectedCercle = cercle;
+          this.loadCommunesForCercle(cercle.id);
+        }
+      }
+    }
+  }
+
+  resetFilterVisibility(): void {
+    this.showYearFilter = false;
+    this.showMonthFilter = false;
+    this.showDayFilter = false;
+    this.showRegionFilter = false;
+    this.showCercleFilter = false;
+    this.showCommuneFilter = false;
+
+    this.selectedYear = null;
+    this.selectedMonth = null;
+    this.selectedDay = null;
+    this.selectedRegion = null;
+    this.selectedCercle = null;
+    this.selectedCommune = null;
+  }
+
+  loadMonthsForYear(documentType: string, year: number): void {
+    this.databaseService.getMonthsByYearAndType(documentType, year).subscribe({
+      next: (months) => {
+        // Filtrer les mois disponibles
+        this.availableMonths = this.availableMonths.filter(m => months.includes(m.value));
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des mois', error);
+      }
+    });
+  }
+
+  loadDaysForMonth(documentType: string, year: number, month: number): void {
+    this.databaseService.getDaysByMonthYearAndType(documentType, year, month).subscribe({
+      next: (days) => {
+        this.availableDays = days;
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des jours', error);
+      }
+    });
+  }
+
+  loadCerclesForRegion(regionId: number): void {
+    this.databaseService.getCerclesByRegion(regionId).subscribe({
+      next: (cercles) => {
+        this.availableCercles = cercles;
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des cercles', error);
+      }
+    });
+  }
+
+  loadCommunesForCercle(cercleId: number): void {
+    this.databaseService.getCommunesByCercle(cercleId).subscribe({
+      next: (communes) => {
+        this.availableCommunes = communes;
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des communes', error);
+      }
+    });
+  }
+
+  // Gestionnaires d'événements pour les mini-filtres
+  onYearFilterChange(): void {
+    if (this.selectedYear) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedYear}/`);
+      this.loadMonthsForYear(documentType, this.selectedYear);
+    }
+  }
+
+  onMonthFilterChange(): void {
+    if (this.selectedYear && this.selectedMonth) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedYear}/${this.selectedMonth}/`);
+      this.loadDaysForMonth(documentType, this.selectedYear, this.selectedMonth);
+    }
+  }
+
+  onDayFilterChange(): void {
+    if (this.selectedYear && this.selectedMonth && this.selectedDay) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedYear}/${this.selectedMonth}/${this.selectedDay}/`);
+    }
+  }
+
+  onRegionFilterChange(): void {
+    if (this.selectedRegion) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedRegion.nom}/`);
+      this.loadCerclesForRegion(this.selectedRegion.id);
+    }
+  }
+
+  onCercleFilterChange(): void {
+    if (this.selectedRegion && this.selectedCercle) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/`);
+      this.loadCommunesForCercle(this.selectedCercle.id);
+    }
+  }
+
+  onCommuneFilterChange(): void {
+    if (this.selectedRegion && this.selectedCercle && this.selectedCommune) {
+      const documentType = this.currentPath.split('/').filter(part => part !== '')[1];
+      this.navigateToPath(`/Archives/${documentType}/${this.selectedRegion.nom}/${this.selectedCercle.nom}/${this.selectedCommune.nom}/`);
+    }
+  }
+
+
+
 
   loadUserPreferences(): void {
     // Charger les préférences depuis le localStorage
@@ -661,6 +893,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     this.currentPath = path;
     this.updateBreadcrumb();
     this.updateUrlParams();
+    this.updateFilterVisibility(); // Mise à jour des filtres
     this.addToHistory(this.currentPath);
     this.loadFolderContent();
   }
@@ -761,6 +994,7 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
     this.updateBreadcrumb();
     this.updateUrlParams();
+    this.updateFilterVisibility(); // Mettre à jour la visibilité des filtres
 
     // Ajouter à l'historique de navigation
     this.addToHistory(this.currentPath);
@@ -779,6 +1013,9 @@ export class ArchiveComponent implements OnInit, OnDestroy {
 
   toggleFilterPanel(): void {
     this.isFilterExpanded = !this.isFilterExpanded;
+
+    // Mise à jour de l'URL
+    this.updateUrlParams();
   }
 
   openDocument(document: Document): void {

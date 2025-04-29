@@ -657,7 +657,7 @@ export class DatabaseService {
                 filteredDocs = filteredDocs.filter(doc => doc.institution_source === filters.institution);
             }
 
-            // Filtre par région (à implémenter avec la logique appropriée)
+            // Filtre par région
             if (filters.region) {
                 // Pour simplifier, nous supposerons que le nom de la région est inclus dans le chemin
                 filteredDocs = filteredDocs.filter(doc =>
@@ -720,8 +720,78 @@ export class DatabaseService {
         return of(this.documents.filter(doc => doc.type_doc === type)).pipe(delay(300));
     }
 
+    // Ajoutons cette méthode au service DatabaseService
+
+    /**
+     * Récupère les documents stockés dans un chemin spécifique
+     * @param path Chemin du dossier
+     * @returns Liste des documents trouvés
+     */
     getDocumentsByPath(path: string): Observable<any[]> {
-        return of(this.documents.filter(doc => doc.chemin.startsWith(path))).pipe(delay(300));
+        // Extraire les parties du chemin
+        const pathParts = path.split('/').filter(part => part !== '');
+
+        // Si nous sommes au dernier niveau (dans un dossier d'institution spécifique)
+        if ((pathParts.length >= 7 && pathParts[5] === "Centre d'état civil") ||
+            (pathParts.length >= 7 && pathParts[5] === "Centre de déclaration") ||
+            (pathParts.length >= 7 && pathParts[5] === "Tribunal")) {
+
+            // Déterminer le type d'institution
+            let institutionType = '';
+            if (pathParts[5] === "Centre d'état civil") {
+                institutionType = "Centre d'état civil";
+            } else if (pathParts[5] === "Centre de déclaration") {
+                institutionType = "Centre de déclaration";
+            } else {
+                institutionType = "Tribunal";
+            }
+
+            // Filtrer les documents selon le type de document et l'institution
+            return this.getDocuments({
+                documentType: pathParts[1],
+                institution: institutionType,
+                region: pathParts[2],
+                // Ajouter d'autres filtres si nécessaire
+            });
+        }
+
+        // Pour les chemins temporels (par date)
+        if (pathParts.length >= 4 && !isNaN(Number(pathParts[2]))) {
+            const year = parseInt(pathParts[2]);
+            const filters: any = {
+                documentType: pathParts[1]
+            };
+
+            // Ajouter les filtres de date
+            if (pathParts.length >= 4) {
+                const month = parseInt(pathParts[3]);
+                if (pathParts.length >= 5) {
+                    const day = parseInt(pathParts[4]);
+                    // Filtrer par jour spécifique
+                    const startDate = new Date(year, month - 1, day);
+                    const endDate = new Date(year, month - 1, day, 23, 59, 59);
+                    filters.startDate = startDate;
+                    filters.endDate = endDate;
+                } else {
+                    // Filtrer par mois
+                    const startDate = new Date(year, month - 1, 1);
+                    const endDate = new Date(year, month, 0, 23, 59, 59);
+                    filters.startDate = startDate;
+                    filters.endDate = endDate;
+                }
+            } else {
+                // Filtrer par année
+                const startDate = new Date(year, 0, 1);
+                const endDate = new Date(year, 11, 31, 23, 59, 59);
+                filters.startDate = startDate;
+                filters.endDate = endDate;
+            }
+
+            return this.getDocuments(filters);
+        }
+
+        // Par défaut, retourner un tableau vide
+        return of([]);
     }
 
     getDocumentTypes(): Observable<string[]> {
