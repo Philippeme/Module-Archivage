@@ -121,43 +121,47 @@
                     <div class="mini-filters ms-3" *ngIf="currentPath !== '/Archives' && !isFilterExpanded">
                         <!-- Par date -->
                         <div class="mini-filter-group" *ngIf="navigationMode === 'date'">
-                            <select class="form-select form-select-sm" *ngIf="showYearFilter" 
-                                    [(ngModel)]="selectedYear" (change)="onYearFilterChange()">
+                            <select class="form-select form-select-sm" *ngIf="showYearFilter" [(ngModel)]="selectedYear"
+                                (change)="onYearFilterChange()">
                                 <option [ngValue]="null">Année</option>
                                 <option *ngFor="let year of availableYears" [ngValue]="year">{{ year }}</option>
                             </select>
-                            
-                            <select class="form-select form-select-sm ms-2" *ngIf="showMonthFilter" 
-                                    [(ngModel)]="selectedMonth" (change)="onMonthFilterChange()">
+
+                            <select class="form-select form-select-sm ms-2" *ngIf="showMonthFilter"
+                                [(ngModel)]="selectedMonth" (change)="onMonthFilterChange()">
                                 <option [ngValue]="null">Mois</option>
-                                <option *ngFor="let month of availableMonths" [ngValue]="month.value">{{ month.label }}</option>
+                                <option *ngFor="let month of availableMonths" [ngValue]="month.value">{{ month.label }}
+                                </option>
                             </select>
-                            
-                            <select class="form-select form-select-sm ms-2" *ngIf="showDayFilter" 
-                                    [(ngModel)]="selectedDay" (change)="onDayFilterChange()">
+
+                            <select class="form-select form-select-sm ms-2" *ngIf="showDayFilter"
+                                [(ngModel)]="selectedDay" (change)="onDayFilterChange()">
                                 <option [ngValue]="null">Jour</option>
                                 <option *ngFor="let day of availableDays" [ngValue]="day">{{ day }}</option>
                             </select>
                         </div>
-                        
+
                         <!-- Par lieu -->
                         <div class="mini-filter-group" *ngIf="navigationMode === 'location'">
-                            <select class="form-select form-select-sm" *ngIf="showRegionFilter" 
-                                    [(ngModel)]="selectedRegion" (change)="onRegionFilterChange()">
+                            <select class="form-select form-select-sm" *ngIf="showRegionFilter"
+                                [(ngModel)]="selectedRegion" (change)="onRegionFilterChange()">
                                 <option [ngValue]="null">Région</option>
-                                <option *ngFor="let region of availableRegions" [ngValue]="region">{{ region.nom }}</option>
+                                <option *ngFor="let region of availableRegions" [ngValue]="region">{{ region.nom }}
+                                </option>
                             </select>
-                            
-                            <select class="form-select form-select-sm ms-2" *ngIf="showCercleFilter" 
-                                    [(ngModel)]="selectedCercle" (change)="onCercleFilterChange()">
+
+                            <select class="form-select form-select-sm ms-2" *ngIf="showCercleFilter"
+                                [(ngModel)]="selectedCercle" (change)="onCercleFilterChange()">
                                 <option [ngValue]="null">Cercle</option>
-                                <option *ngFor="let cercle of availableCercles" [ngValue]="cercle">{{ cercle.nom }}</option>
+                                <option *ngFor="let cercle of availableCercles" [ngValue]="cercle">{{ cercle.nom }}
+                                </option>
                             </select>
-                            
-                            <select class="form-select form-select-sm ms-2" *ngIf="showCommuneFilter" 
-                                    [(ngModel)]="selectedCommune" (change)="onCommuneFilterChange()">
+
+                            <select class="form-select form-select-sm ms-2" *ngIf="showCommuneFilter"
+                                [(ngModel)]="selectedCommune" (change)="onCommuneFilterChange()">
                                 <option [ngValue]="null">Commune</option>
-                                <option *ngFor="let commune of availableCommunes" [ngValue]="commune">{{ commune.nom }}</option>
+                                <option *ngFor="let commune of availableCommunes" [ngValue]="commune">{{ commune.nom }}
+                                </option>
                             </select>
                         </div>
                     </div>
@@ -171,20 +175,22 @@
                             <i class="bi bi-window-plus"></i> Onglets
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" (click)="openMultipleTabsForFolders(currentFolders)">Ouvrir tous
+                            <li><a class="dropdown-item" (click)="openMultipleTabsForFolders(currentFolders)">Ouvrir
+                                    tous
                                     les
                                     dossiers actuels</a></li>
                             <li>
                                 <hr class="dropdown-divider">
                             </li>
                             <li *ngFor="let segment of breadcrumbSegments">
-                                <a class="dropdown-item" (click)="openInNewTab({name: segment.name, path: segment.path})">
+                                <a class="dropdown-item"
+                                    (click)="openInNewTab({name: segment.name, path: segment.path})">
                                     {{ segment.name }}
                                 </a>
                             </li>
                         </ul>
                     </div>
-                    
+
                     <!-- Boutons Réinitialiser et Sauvegarder uniquement visibles dans les filtres avancés -->
                     <div class="filter-action-buttons" *ngIf="isFilterExpanded">
                         <button class="btn btn-sm btn-outline-secondary me-2" (click)="resetFilters()">
@@ -263,7 +269,7 @@
             </app-document-list>
 
             <app-document-grid *ngIf="viewMode === 'grid'" [folders]="currentFolders" [documents]="currentDocuments"
-                [isLastLevel]="isAtLastLevel" (folderSelected)="openFolder($event)" 
+                [isLastLevel]="isAtLastLevel" (folderSelected)="openFolder($event)"
                 (folderContextMenu)="openInNewTab($event)" (documentSelected)="openDocument($event)">
             </app-document-grid>
 

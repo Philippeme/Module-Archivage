@@ -66,6 +66,30 @@ export class DocumentService {
     }));
   }
 
+  pluralizeFolderName(name: string): string {
+    // Vérifier si le nom est déjà au pluriel
+    if (name.endsWith('s')) return name;
+
+    // Cas spéciaux
+    if (name === 'Acte de naissance') return 'Actes de naissance';
+    if (name === 'Acte de mariage') return 'Actes de mariage';
+    if (name === 'Acte de décès') return 'Actes de décès';
+    if (name === 'Déclaration de naissance') return 'Déclarations de naissance';
+    if (name === 'Déclaration de décès') return 'Déclarations de décès';
+    if (name === 'Certificat de décès') return 'Certificats de décès';
+    if (name === 'Publication de mariage') return 'Publications de mariage';
+    if (name === 'Certificat de non opposition') return 'Certificats de non opposition';
+    if (name === 'Fiche de non inscription') return 'Fiches de non inscription';
+    if (name === 'Jugement supplétif') return 'Jugements supplétifs';
+    if (name === 'Jugement rectificatif') return 'Jugements rectificatifs';
+    if (name === 'Jugement d\'annulation') return 'Jugements d\'annulation';
+    if (name === 'Jugement d\'homologation') return 'Jugements d\'homologation';
+    if (name === 'Jugement déclaratif') return 'Jugements déclaratifs';
+
+    // Cas général
+    return name + 's';
+  }
+
   // Ajouter à DocumentService.ts
   /**
    * Calcule la taille réelle d'un document à partir de son chemin
@@ -1110,7 +1134,7 @@ export class DocumentService {
   getFolderIcon(folder: Folder): string {
     switch (folder.type) {
       case 'document-type':
-        
+
         return 'bi-folder-fill';
       case 'year':
         return 'bi-calendar-year';
@@ -1135,7 +1159,7 @@ export class DocumentService {
   getFolderColor(folder: Folder): string {
     switch (folder.type) {
       case 'document-type':
-    
+
         return 'text-warning';
       case 'year':
         return 'text-primary';

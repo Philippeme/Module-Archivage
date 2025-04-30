@@ -94,9 +94,8 @@
                 <!-- Cercle -->
                 <div class="col-md-4 mb-3">
                     <label for="cercle" class="form-label">Cercle</label>
-                    <select class="form-select" id="cercle" [disabled]="!selectedRegion"
-                        [ngModel]="selectedCercle?.id" (ngModelChange)="onCercleChange($event)"
-                        [ngModelOptions]="{standalone: true}">
+                    <select class="form-select" id="cercle" [disabled]="!selectedRegion" [ngModel]="selectedCercle?.id"
+                        (ngModelChange)="onCercleChange($event)" [ngModelOptions]="{standalone: true}">
                         <option [ngValue]="null">Tous</option>
                         <option *ngFor="let cercle of cercles" [ngValue]="cercle.id">{{ cercle.nom }}</option>
                     </select>
@@ -131,7 +130,8 @@
                     <select class="form-select" id="centreDeclaration" formControlName="centreDeclaration"
                         (ngModelChange)="onCentreDeclarationChange($event)">
                         <option [ngValue]="null">Tous</option>
-                        <option *ngFor="let centre of centresDeclaration" [ngValue]="centre.id">{{ centre.nom }}</option>
+                        <option *ngFor="let centre of centresDeclaration" [ngValue]="centre.id">{{ centre.nom }}
+                        </option>
                     </select>
                 </div>
 

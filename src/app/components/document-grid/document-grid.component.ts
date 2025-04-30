@@ -27,7 +27,7 @@ export class DocumentGridComponent {
     const menuItems = [
       { label: 'Ouvrir dans un nouvel onglet', action: 'newtab' }
     ];
-    
+
     // Créer et positionner le menu contextuel
     this.createContextMenu(event, menuItems, (action: string) => {
       if (action === 'newtab') {
@@ -35,14 +35,42 @@ export class DocumentGridComponent {
       }
     });
   }
-  
+
+  // Ajouter une méthode pour pluraliser les noms de dossiers
+  pluralizeFolderName(folder: Folder): string {
+    // Ne pluraliser que les dossiers de premier niveau
+    if (folder.path.split('/').filter(segment => segment !== '').length === 2) {
+
+      // Cas spéciaux pour les 14 types de documents
+      switch (folder.name) {
+        case 'Acte de naissance': return 'Actes de naissance';
+        case 'Acte de mariage': return 'Actes de mariage';
+        case 'Acte de décès': return 'Actes de décès';
+        case 'Déclaration de naissance': return 'Déclarations de naissance';
+        case 'Déclaration de décès': return 'Déclarations de décès';
+        case 'Certificat de décès': return 'Certificats de décès';
+        case 'Publication de mariage': return 'Publications de mariage';
+        case 'Certificat de non opposition': return 'Certificats de non opposition';
+        case 'Fiche de non inscription': return 'Fiches de non inscription';
+        case 'Jugement supplétif': return 'Jugements supplétifs';
+        case 'Jugement rectificatif': return 'Jugements rectificatifs';
+        case 'Jugement d\'annulation': return 'Jugements d\'annulation';
+        case 'Jugement d\'homologation': return 'Jugements d\'homologation';
+        case 'Jugement déclaratif': return 'Jugements déclaratifs';
+        default: return folder.name;
+      }
+    }
+
+    return folder.name;
+  }
+
   private createContextMenu(event: MouseEvent, items: { label: string, action: string }[], callback: (action: string) => void): void {
     // Supprimer tout menu contextuel existant
     const existingMenu = document.querySelector('.custom-context-menu');
     if (existingMenu) {
       existingMenu.remove();
     }
-    
+
     // Créer le menu
     const menu = document.createElement('div');
     menu.className = 'custom-context-menu';
@@ -54,7 +82,7 @@ export class DocumentGridComponent {
     menu.style.borderRadius = '4px';
     menu.style.padding = '5px 0';
     menu.style.zIndex = '1000';
-    
+
     // Ajouter les éléments du menu
     items.forEach(item => {
       const menuItem = document.createElement('div');
@@ -63,31 +91,31 @@ export class DocumentGridComponent {
       menuItem.style.padding = '8px 12px';
       menuItem.style.cursor = 'pointer';
       menuItem.style.fontSize = '14px';
-      
+
       menuItem.onmouseover = () => {
         menuItem.style.backgroundColor = '#f8f9fa';
       };
-      
+
       menuItem.onmouseout = () => {
         menuItem.style.backgroundColor = 'transparent';
       };
-      
+
       menuItem.onclick = () => {
         callback(item.action);
         menu.remove();
       };
-      
+
       menu.appendChild(menuItem);
     });
-    
+
     // Ajouter le menu au DOM
     document.body.appendChild(menu);
-    
+
     // Supprimer le menu lorsqu'on clique ailleurs
     document.addEventListener('click', () => {
       menu.remove();
     }, { once: true });
-    
+
     // Empêcher la propagation pour éviter de fermer immédiatement
     menu.addEventListener('click', (e) => {
       e.stopPropagation();

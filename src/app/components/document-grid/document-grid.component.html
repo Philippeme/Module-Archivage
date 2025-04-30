@@ -36,7 +36,7 @@
       <div class="icon-container">
         <i class="bi" [ngClass]="folder.iconClass || 'bi-folder-fill'" [class]="folder.colorClass || 'text-warning'"></i>
       </div>
-      <div class="item-name">{{ folder.name }}</div>
+      <div class="item-name">{{ pluralizeFolderName(folder) }}</div>
       <div class="item-details">
         {{ folder.lastModificationDate | date:'dd/MM/yyyy' }}
       </div>

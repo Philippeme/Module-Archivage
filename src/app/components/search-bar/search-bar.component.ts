@@ -1,3 +1,4 @@
+// src/app/components/search-bar/search-bar.component.ts
 import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { Observable, Subject, of, switchMap } from 'rxjs';
@@ -26,9 +27,9 @@ export class SearchBarComponent implements OnInit, OnDestroy {
     // Configurer l'auto-suggestion
     this.suggestions$ = this.searchControl.valueChanges.pipe(
       takeUntil(this.destroy$),
-      debounceTime(200), // Réduire le délai pour une expérience plus réactive
+      debounceTime(200),
       distinctUntilChanged(),
-      filter(term => !!term && term.length >= 2),
+      filter(term => !!term && term.length >= 1), // Modifié pour réagir dès le premier caractère
       tap(() => this.isLoading = true),
       switchMap(term => this.filterService.getSearchSuggestions(term || '').pipe(
         catchError(() => of([])),
@@ -39,10 +40,10 @@ export class SearchBarComponent implements OnInit, OnDestroy {
     // Également émettre la recherche après un délai
     this.searchControl.valueChanges.pipe(
       takeUntil(this.destroy$),
-      debounceTime(700), // Délai suffisant pour que l'utilisateur finisse de taper
+      debounceTime(700),
       distinctUntilChanged()
     ).subscribe(term => {
-      if (term && term.length >= 3) {
+      if (term && term.length >= 1) { // Modifié pour réagir dès le premier caractère
         this.search.emit(term);
       }
     });

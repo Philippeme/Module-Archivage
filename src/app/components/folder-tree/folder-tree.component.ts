@@ -11,7 +11,7 @@ export class FolderTreeComponent implements OnInit, OnChanges {
   @Input() navigationMode: 'date' | 'location' = 'date';
   @Input() currentPath: string = '/Archives';
   @Output() folderSelected = new EventEmitter<Folder>();
-  
+
   rootFolders: Folder[] = [];
   expandedFolders: { [path: string]: boolean } = {};
   loadedFolders: { [path: string]: Folder[] } = {};
@@ -30,7 +30,7 @@ export class FolderTreeComponent implements OnInit, OnChanges {
       this.loadedFolders = {};
       this.loadRootFolders();
     }
-    
+
     if (changes['currentPath'] && !changes['currentPath'].firstChange) {
       // Développer les dossiers jusqu'au chemin actuel
       this.expandPathToCurrentFolder();
@@ -41,15 +41,15 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     this.isLoading = true;
     this.documentService.getRootFolders().subscribe({
       next: (folders) => {
-        // Conversion au pluriel des noms de dossiers
+        // Appliquer la pluralisation aux noms des dossiers de premier niveau
         this.rootFolders = folders.map(folder => ({
           ...folder,
           name: this.pluralizeFolderName(folder.name),
-          iconClass: 'bi-folder-fill', // Uniformisation des icônes
-          colorClass: 'text-warning'
+          iconClass: this.documentService.getFolderIcon(folder),
+          colorClass: this.documentService.getFolderColor(folder)
         }));
         this.isLoading = false;
-        
+
         // Développer les dossiers jusqu'au chemin actuel
         this.expandPathToCurrentFolder();
       },
@@ -60,48 +60,45 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     });
   }
 
-  // Méthode pour convertir les noms de dossiers au pluriel
+  // Fonction optimisée pour la pluralisation des noms des dossiers de premier niveau
   pluralizeFolderName(name: string): string {
-    // Vérifier si le nom est déjà au pluriel
-    if (name.endsWith('s')) return name;
-    
-    // Cas spéciaux
-    if (name === 'Acte de naissance') return 'Actes de naissance';
-    if (name === 'Acte de mariage') return 'Actes de mariage';
-    if (name === 'Acte de décès') return 'Actes de décès';
-    if (name === 'Déclaration de naissance') return 'Déclarations de naissance';
-    if (name === 'Déclaration de décès') return 'Déclarations de décès';
-    if (name === 'Certificat de décès') return 'Certificats de décès';
-    if (name === 'Publication de mariage') return 'Publications de mariage';
-    if (name === 'Certificat de non opposition') return 'Certificats de non opposition';
-    if (name === 'Fiche de non inscription') return 'Fiches de non inscription';
-    if (name === 'Jugement supplétif') return 'Jugements supplétifs';
-    if (name === 'Jugement rectificatif') return 'Jugements rectificatifs';
-    if (name === 'Jugement d\'annulation') return 'Jugements d\'annulation';
-    if (name === 'Jugement d\'homologation') return 'Jugements d\'homologation';
-    if (name === 'Jugement déclaratif') return 'Jugements déclaratifs';
-    
-    // Cas général
-    return name + 's';
+    // Cas spéciaux pour les 14 types de documents
+    switch (name) {
+      case 'Acte de naissance': return 'Actes de naissance';
+      case 'Acte de mariage': return 'Actes de mariage';
+      case 'Acte de décès': return 'Actes de décès';
+      case 'Déclaration de naissance': return 'Déclarations de naissance';
+      case 'Déclaration de décès': return 'Déclarations de décès';
+      case 'Certificat de décès': return 'Certificats de décès';
+      case 'Publication de mariage': return 'Publications de mariage';
+      case 'Certificat de non opposition': return 'Certificats de non opposition';
+      case 'Fiche de non inscription': return 'Fiches de non inscription';
+      case 'Jugement supplétif': return 'Jugements supplétifs';
+      case 'Jugement rectificatif': return 'Jugements rectificatifs';
+      case 'Jugement d\'annulation': return 'Jugements d\'annulation';
+      case 'Jugement d\'homologation': return 'Jugements d\'homologation';
+      case 'Jugement déclaratif': return 'Jugements déclaratifs';
+      default: return name;
+    }
   }
 
   expandPathToCurrentFolder(): void {
     if (!this.currentPath || this.currentPath === '/Archives') {
       return;
     }
-    
+
     const pathSegments = this.currentPath.split('/').filter(segment => segment !== '');
     if (pathSegments.length <= 1) {
       return;
     }
-    
+
     // Développer chaque segment du chemin
     let currentPath = '/Archives';
-    
+
     for (let i = 1; i < pathSegments.length; i++) {
       currentPath += `/${pathSegments[i]}`;
       this.expandedFolders[currentPath] = true;
-      
+
       // Charger les sous-dossiers si nécessaire
       this.loadSubfolders(currentPath);
     }
@@ -111,14 +108,14 @@ export class FolderTreeComponent implements OnInit, OnChanges {
     if (this.loadedFolders[path]) {
       return; // Les sous-dossiers sont déjà chargés
     }
-    
+
     this.isLoading = true;
     this.documentService.loadFolders(path, this.navigationMode).subscribe({
       next: (folders) => {
         this.loadedFolders[path] = folders.map(folder => ({
           ...folder,
-          iconClass: this.getIconByType(folder.type),
-          colorClass: this.getColorByType(folder.type)
+          iconClass: this.documentService.getFolderIcon(folder),
+          colorClass: this.documentService.getFolderColor(folder)
         }));
         this.isLoading = false;
       },
@@ -131,7 +128,7 @@ export class FolderTreeComponent implements OnInit, OnChanges {
 
   getIconByType(type: string | undefined): string {
     if (!type) return 'bi-folder-fill'; // Valeur par défaut
-    switch(type) {
+    switch (type) {
       case 'year': return 'bi-calendar-year';
       case 'month': return 'bi-calendar-month';
       case 'day': return 'bi-calendar-day';
@@ -145,7 +142,7 @@ export class FolderTreeComponent implements OnInit, OnChanges {
 
   getColorByType(type: string | undefined): string {
     if (!type) return 'text-warning'; // Valeur par défaut
-    switch(type) {
+    switch (type) {
       case 'year': return 'text-primary';
       case 'month': return 'text-success';
       case 'day': return 'text-info';
@@ -161,15 +158,15 @@ export class FolderTreeComponent implements OnInit, OnChanges {
   toggleAndSelectFolder(folder: Folder, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Inverser l'état d'expansion
     this.expandedFolders[folder.path] = !this.expandedFolders[folder.path];
-    
+
     // Charger les sous-dossiers si le dossier est développé et que les sous-dossiers ne sont pas encore chargés
     if (this.expandedFolders[folder.path] && !this.loadedFolders[folder.path]) {
       this.loadSubfolders(folder.path);
     }
-    
+
     // Émettre l'événement de sélection
     this.folderSelected.emit(folder);
   }
@@ -178,10 +175,10 @@ export class FolderTreeComponent implements OnInit, OnChanges {
   toggleFolder(folder: Folder, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Inverser l'état d'expansion
     this.expandedFolders[folder.path] = !this.expandedFolders[folder.path];
-    
+
     // Charger les sous-dossiers si le dossier est développé et que les sous-dossiers ne sont pas encore chargés
     if (this.expandedFolders[folder.path] && !this.loadedFolders[folder.path]) {
       this.loadSubfolders(folder.path);

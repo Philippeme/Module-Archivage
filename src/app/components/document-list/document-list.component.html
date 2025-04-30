@@ -50,7 +50,7 @@
                 <td>
                     <i class="bi me-2" [ngClass]="folder.iconClass || 'bi-folder-fill'"
                         [class]="folder.colorClass || 'text-warning'"></i>
-                    {{ folder.name }}
+                    {{ pluralizeFolderName(folder) }}
                 </td>
                 <td>-</td>
                 <td>{{ folder.creationDate | date:'dd/MM/yyyy' }}</td>

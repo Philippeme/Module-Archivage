@@ -98,8 +98,11 @@
     padding: 15px;
     background-color: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
-    max-height: 450px;
+    max-height: 450px; /* Hauteur maximale fixe */
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
   }
   
   .breadcrumb-container {

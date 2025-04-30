@@ -15,6 +15,7 @@ import { DatabaseService } from '../../services/database.service';
 })
 export class AdvancedFilterComponent implements OnInit, OnDestroy {
   @Output() filtersChanged = new EventEmitter<FilterCriteria>();
+  @Output() saveFilter = new EventEmitter<void>();
 
   filterForm: FormGroup;
   documentTypes = Object.values(DocumentType);
@@ -68,12 +69,24 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     ).subscribe(filter => {
       if (filter) {
         this.filterForm.patchValue(filter.criteria);
+
+        // Appliquer les changements de l'opérateur logique
+        if (filter.criteria.logicalOperator) {
+          this.updateFormValidations(filter.criteria.logicalOperator);
+        }
       }
+    });
+
+    // Observer les changements de l'opérateur logique
+    this.filterForm.get('logicalOperator')?.valueChanges.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(value => {
+      this.updateFormValidations(value);
     });
 
     // Observer les changements du formulaire et appliquer les filtres
     this.filterForm.valueChanges.pipe(
-      debounceTime(300), // Attendre que l'utilisateur ait fini de taper
+      debounceTime(300),
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       takeUntil(this.destroy$)
     ).subscribe(values => {
@@ -90,6 +103,71 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // Nouvelle méthode pour mettre à jour les validations du formulaire en fonction de l'opérateur logique
+  updateFormValidations(operatorValue: 'AND' | 'OR'): void {
+    // Obtenir tous les contrôles sauf l'opérateur logique
+    const controls = Object.keys(this.filterForm.controls).filter(key => key !== 'logicalOperator');
+
+    if (operatorValue === 'AND') {
+      // Pour AND, tous les champs doivent être valides pour que le filtre soit appliqué
+      // Les validations sont plus strictes
+
+      // Renforcer les validations pour les dates
+      if (this.filterForm.get('startDate')?.value && !this.filterForm.get('endDate')?.value) {
+        // Si une date de début est spécifiée, la date de fin devrait également être spécifiée
+        this.filterForm.get('endDate')?.setErrors({ required: true });
+      }
+
+      // Vérifier que les sélections géographiques sont cohérentes
+      if (this.selectedRegion) {
+        // Si une région est sélectionnée, les autres sélections doivent être cohérentes
+        if (this.filterForm.get('centreEtatCivil')?.value && !this.selectedCommune) {
+          this.filterForm.get('centreEtatCivil')?.setErrors({ invalidHierarchy: true });
+        }
+
+        if (this.filterForm.get('centreDeclaration')?.value && !this.selectedCommune) {
+          this.filterForm.get('centreDeclaration')?.setErrors({ invalidHierarchy: true });
+        }
+
+        if (this.filterForm.get('tribunal')?.value && !this.selectedCommune) {
+          this.filterForm.get('tribunal')?.setErrors({ invalidHierarchy: true });
+        }
+      }
+
+      // Si une personne concernée est spécifiée, le type de document devrait également être spécifié
+      if (this.filterForm.get('concernedPerson')?.value && !this.filterForm.get('documentType')?.value) {
+        this.filterForm.get('documentType')?.setErrors({ requiredWithPerson: true });
+      }
+    } else {
+      // Pour OR, au moins un champ doit être valide pour que le filtre soit appliqué
+      // Les validations sont plus souples
+
+      // Réinitialiser les erreurs ajoutées pour l'opérateur AND
+      this.filterForm.get('endDate')?.setErrors(null);
+      this.filterForm.get('centreEtatCivil')?.setErrors(null);
+      this.filterForm.get('centreDeclaration')?.setErrors(null);
+      this.filterForm.get('tribunal')?.setErrors(null);
+      this.filterForm.get('documentType')?.setErrors(null);
+
+      // Vérifier qu'au moins un champ est rempli
+      const hasValue = controls.some(controlName => {
+        const control = this.filterForm.get(controlName);
+        return control && control.value !== null && control.value !== '' &&
+          (Array.isArray(control.value) ? control.value.length > 0 : true);
+      });
+
+      // Si aucun champ n'est rempli, afficher une erreur générale
+      if (!hasValue) {
+        // Plutôt que de définir des erreurs par champ, nous pourrions afficher un message
+        // dans le composant parent indiquant qu'au moins un critère doit être spécifié
+        // Mais pour l'instant, nous ne faisons rien car tous les champs sont optionnels
+      }
+    }
+
+    // Mettre à jour la validité du formulaire
+    this.filterForm.updateValueAndValidity({ emitEvent: false });
   }
 
   createFilterForm(): FormGroup {
@@ -117,10 +195,11 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     const formValues = this.filterForm.value;
+    const logicalOperator = formValues.logicalOperator;
 
     // Ne prendre que les valeurs non vides
     const criteria: FilterCriteria = Object.entries(formValues).reduce((acc, [key, value]) => {
-      if (value !== null && value !== '' && Array.isArray(value) ? value.length > 0 : true) {
+      if (value !== null && value !== '' && (Array.isArray(value) ? value.length > 0 : true)) {
         if (key in acc || Object.keys(new Object() as FilterCriteria).includes(key)) {
           acc[key as keyof FilterCriteria] = value as any;
         }
@@ -128,20 +207,40 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       return acc;
     }, {} as FilterCriteria);
 
+    // S'assurer que l'opérateur logique est toujours inclus, même s'il s'agit de la valeur par défaut
+    criteria.logicalOperator = logicalOperator;
+
     // Mettre à jour le service de filtres et émettre le changement
     this.filterService.updateFilter(criteria);
     this.filtersChanged.emit(criteria);
   }
 
   resetFilters(): void {
-    this.filterService.resetFilter();
-    this.filterForm.reset({
+    // Réinitialiser complètement le formulaire
+    this.filterForm.reset();
+
+    // Réappliquer uniquement les valeurs par défaut nécessaires
+    this.filterForm.patchValue({
       logicalOperator: 'AND',
       excludeDeleted: true,
       sortBy: 'creationDate',
-      sortDirection: 'desc'
+      sortDirection: 'desc',
+      documentType: null,
+      region: null,
+      cercle: null,
+      commune: null,
+      centreEtatCivil: null,
+      centreDeclaration: null,
+      tribunal: null,
+      startDate: null,
+      endDate: null,
+      concernedPerson: '',
+      sourceInstitution: null,
+      creator: '',
+      lastModifier: '',
+      searchTerm: ''
     });
-    
+
     // Réinitialiser les sélections géographiques
     this.selectedRegion = null;
     this.selectedCercle = null;
@@ -151,9 +250,11 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     this.centresEtatCivil = [];
     this.centresDeclaration = [];
     this.tribunaux = [];
-    
+
+    // Appliquer les filtres réinitialisés
     this.applyFilters();
   }
+
 
   loadSavedFilters(): void {
     this.isLoading = true;
@@ -169,14 +270,24 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     });
   }
 
+  onSaveFilter(): void {
+    this.saveFilter.emit();
+  }
+
   loadFilter(filterId: string): void {
     this.isLoading = true;
     this.filterService.loadFilter(filterId).subscribe({
       next: (filter) => {
         this.filterForm.patchValue(filter.criteria);
+
+        // Mettre à jour les validations en fonction de l'opérateur logique
+        if (filter.criteria.logicalOperator) {
+          this.updateFormValidations(filter.criteria.logicalOperator as 'AND' | 'OR');
+        }
+
         this.applyFilters();
         this.isLoading = false;
-        
+
         // Mettre à jour les sélections géographiques
         if (filter.criteria.region) {
           const regionId = this.regions.find(r => r.nom === filter.criteria.region)?.id;
@@ -188,38 +299,6 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       error: (error) => {
         console.error('Erreur lors du chargement du filtre', error);
         this.isLoading = false;
-      }
-    });
-  }
-
-  saveFilter(): void {
-    const dialogRef = this.dialog.open(SaveFilterDialogComponent, {
-      width: '400px',
-      data: {
-        filter: {
-          criteria: this.filterForm.value
-        },
-        existingFilters: this.savedFilters
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.isLoading = true;
-        this.filterService.saveFilter(
-          { criteria: this.filterForm.value },
-          result.name,
-          result.description
-        ).subscribe({
-          next: (savedFilter) => {
-            this.savedFilters = [...this.savedFilters.filter(f => f.id !== savedFilter.id), savedFilter];
-            this.isLoading = false;
-          },
-          error: (error) => {
-            console.error('Erreur lors de la sauvegarde du filtre', error);
-            this.isLoading = false;
-          }
-        });
       }
     });
   }
@@ -243,14 +322,14 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ region: region.nom });
       this.selectedRegion = region;
     }
-    
+
     this.selectedCercle = null;
     this.selectedCommune = null;
     this.communes = [];
     this.centresEtatCivil = [];
     this.centresDeclaration = [];
     this.tribunaux = [];
-    
+
     this.filterForm.patchValue({
       cercle: null,
       commune: null,
@@ -269,7 +348,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
         }
       });
     }
-    
+
     this.applyFilters();
   }
 
@@ -280,12 +359,12 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ cercle: cercle.nom });
       this.selectedCercle = cercle;
     }
-    
+
     this.selectedCommune = null;
     this.centresEtatCivil = [];
     this.centresDeclaration = [];
     this.tribunaux = [];
-    
+
     this.filterForm.patchValue({
       commune: null,
       centreEtatCivil: null,
@@ -303,7 +382,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
         }
       });
     }
-    
+
     this.applyFilters();
   }
 
@@ -314,7 +393,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ commune: commune.nom });
       this.selectedCommune = commune;
     }
-    
+
     this.filterForm.patchValue({
       centreEtatCivil: null,
       centreDeclaration: null,
@@ -331,7 +410,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
           console.error('Error loading centres d\'état civil', error);
         }
       });
-      
+
       // Charger les centres de déclaration
       this.databaseService.getCentresDeclarationByCommune(communeId).subscribe({
         next: (centres) => {
@@ -341,7 +420,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
           console.error('Error loading centres de déclaration', error);
         }
       });
-      
+
       // Charger les tribunaux
       this.databaseService.getTribunauxByCommune(communeId).subscribe({
         next: (tribunaux) => {
@@ -352,7 +431,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
         }
       });
     }
-    
+
     this.applyFilters();
   }
 
@@ -362,7 +441,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     if (centre) {
       this.filterForm.patchValue({ centreEtatCivil: centre.nom });
     }
-    
+
     this.applyFilters();
   }
 
@@ -372,7 +451,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     if (centre) {
       this.filterForm.patchValue({ centreDeclaration: centre.nom });
     }
-    
+
     this.applyFilters();
   }
 
@@ -382,7 +461,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     if (tribunal) {
       this.filterForm.patchValue({ tribunal: tribunal.nom });
     }
-    
+
     this.applyFilters();
   }
 }

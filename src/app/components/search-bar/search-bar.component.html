@@ -61,7 +61,7 @@
         </div>
       </div>
       
-      <div class="no-suggestions" *ngIf="!isLoading && suggestions.length === 0 && searchControl.value && searchControl.value.length >= 2">
+      <div class="no-suggestions" *ngIf="!isLoading && suggestions.length === 0 && searchControl.value && searchControl.value.length >= 1">
         Aucune suggestion trouvée pour "{{ searchControl.value }}"
       </div>
     </div>
