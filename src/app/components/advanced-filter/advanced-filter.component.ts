@@ -93,7 +93,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       takeUntil(this.destroy$)
     ).subscribe(values => {
-      this.applyFilters.emit(this.prepareFilters());
+      this.filtersChanged.emit(this.prepareFilters());
     });
 
     // Charger les filtres sauvegardés
@@ -108,7 +108,14 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // Nouvelle méthode pour préparer les filtres
+  // Nouvelle méthode pour appliquer directement les filtres aux documents
+  applyDirectlyFiltersToDocs(): void {
+    const criteria = this.prepareFilters();
+    this.applyFilters.emit(criteria);
+    this.showSuccessMessage('Filtres appliqués avec succès');
+  }
+
+  // Méthode pour préparer les filtres
   prepareFilters(): FilterCriteria {
     const formValues = this.filterForm.value;
     const logicalOperator = formValues.logicalOperator;
@@ -223,9 +230,6 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     // Mettre à jour le service de filtres et émettre le changement
     this.filterService.updateFilter(criteria);
     this.filtersChanged.emit(criteria);
-
-    // Émettre un événement pour appliquer directement les filtres
-    this.applyFilters.emit(criteria);
   }
 
   doSaveFilter(): void {
@@ -246,10 +250,12 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       if (result) {
         this.isLoading = true;
         this.filterService.saveFilter(
-          { criteria: criteria },
+          { 
+            criteria: criteria,
+            isDefault: result.isDefault || false  // Intégré dans l'objet filtre
+          },
           result.name,
-          result.description,
-          result.isDefault || false
+          result.description
         ).subscribe({
           next: (savedFilter) => {
             this.savedFilters = [...this.savedFilters.filter(f => f.id !== savedFilter.id), savedFilter];

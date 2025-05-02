@@ -208,15 +208,12 @@
 
         <!-- Filtres avancés -->
         <div class="advanced-filter-panel" *ngIf="isFilterExpanded">
-            <app-advanced-filter 
-                (filtersChanged)="applyFilters($event)" 
-                (applyFilters)="applyFiltersDirectly($event)"
-                (saveFilter)="closeFilterPanel()">
-            </app-advanced-filter>
+            <app-advanced-filter (filtersChanged)="applyFilters($event)"
+                (saveFilter)="saveCurrentFilter()"></app-advanced-filter>
         </div>
 
         <!-- Chemin de navigation (breadcrumb) -->
-        <div class="breadcrumb-container">
+        <div class="breadcrumb-container" *ngIf="!isFilterExpanded">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li *ngFor="let segment of breadcrumbSegments; let isLast = last" class="breadcrumb-item"
@@ -230,19 +227,19 @@
         </div>
 
         <!-- Alerte d'erreur -->
-        <div class="alert alert-danger m-3" *ngIf="errorMessage">
+        <div class="alert alert-danger m-3" *ngIf="errorMessage && !isFilterExpanded">
             {{ errorMessage }}
         </div>
 
         <!-- Indicateur de chargement -->
-        <div class="loading-container" *ngIf="isLoading">
+        <div class="loading-container" *ngIf="isLoading && !isFilterExpanded">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Chargement...</span>
             </div>
         </div>
 
         <!-- Mode recherche -->
-        <div class="content-container" *ngIf="!isLoading && isSearchMode">
+        <div class="content-container" *ngIf="!isFilterExpanded && !isLoading && isSearchMode">
             <div class="search-results">
                 <div class="search-header">
                     <h4>Résultats de recherche pour "{{ searchTerm }}"</h4>
@@ -266,7 +263,7 @@
         </div>
 
         <!-- Mode navigation -->
-        <div class="content-container" *ngIf="!isLoading && !isSearchMode">
+        <div class="content-container" *ngIf="!isFilterExpanded && !isLoading && !isSearchMode">
             <app-document-list *ngIf="viewMode === 'list'" [folders]="currentFolders" [documents]="currentDocuments"
                 [isLastLevel]="isAtLastLevel" (folderSelected)="openFolder($event)"
                 (folderContextMenu)="openInNewTab($event)" (documentSelected)="openDocument($event)">

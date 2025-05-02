@@ -1,11 +1,11 @@
 .advanced-filter-container {
-  position: relative;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
   background-color: #fff;
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 15px;
-  overflow-y: auto;
-  height: calc(100vh - 160px); /* Ajusté pour occupe tout l'espace vertical disponible */
+  padding: 20px;
   display: flex;
   flex-direction: column;
 }
@@ -25,17 +25,15 @@
   color: #495057;
 }
 
-.additional-options {
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #dee2e6;
-  margin-bottom: 15px;
+.geographic-filters {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
+.additional-options {
+  margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid #dee2e6;
 }
@@ -89,13 +87,7 @@
   opacity: 0.65;
 }
 
-/* Adaptation pour utiliser tout l'espace disponible */
-.geographic-filters {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
+/* Adaptation des marges pour optimiser l'espace */
 .row {
   margin-left: -7.5px;
   margin-right: -7.5px;
@@ -105,18 +97,4 @@
 .col-md-6 {
   padding-left: 7.5px;
   padding-right: 7.5px;
-}
-
-.alert {
-  margin-bottom: 15px;
-}
-
-/* Ajustements de la hauteur et du scroll */
-.form-control, .form-select {
-  min-height: 38px;
-}
-
-.is-invalid {
-  padding-right: calc(1.5em + 0.75rem) !important;
-  background-position: right calc(0.375em + 0.1875rem) center !important;
 }

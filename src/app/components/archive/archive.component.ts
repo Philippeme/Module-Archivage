@@ -1011,11 +1011,14 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     this.saveUserPreferences();
   }
 
+  // Méthode pour basculer le panneau des filtres avancés
   toggleFilterPanel(): void {
     this.isFilterExpanded = !this.isFilterExpanded;
 
-    // Mise à jour de l'URL
-    this.updateUrlParams();
+    // Si nous fermons le panneau des filtres avancés, mise à jour de l'URL
+    if (!this.isFilterExpanded) {
+      this.updateUrlParams();
+    }
   }
 
   openDocument(document: Document): void {
