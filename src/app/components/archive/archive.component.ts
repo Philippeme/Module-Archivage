@@ -1174,6 +1174,31 @@ export class ArchiveComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Ajouter cette méthode au composant ArchiveComponent
+
+  applyFiltersDirectly(criteria: FilterCriteria): void {
+    // Appliquer directement les filtres sur les documents
+    this.isLoading = true;
+    this.documentService.getDocuments(criteria).subscribe({
+      next: (documents) => {
+        this.currentFolders = [];
+        this.currentDocuments = documents;
+        this.isLoading = false;
+        this.isSearchMode = true; // Activer le mode recherche pour afficher les résultats
+      },
+      error: (error) => {
+        console.error('Erreur lors de l\'application des filtres', error);
+        this.errorMessage = `Erreur lors de l'application des filtres: ${error.message}`;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  closeFilterPanel(): void {
+    // Fermer le panneau des filtres après sauvegarde
+    this.isFilterExpanded = false;
+  }
+
   onSearch(term: string): void {
     this.searchTerm = term;
 
@@ -1213,6 +1238,13 @@ export class ArchiveComponent implements OnInit, OnDestroy {
   }
 
   saveCurrentFilter(): void {
+    // Vérifier d'abord la validité du filtre actuel
+    if (!this.currentFilter) {
+      this.errorMessage = "Aucun filtre actif à sauvegarder.";
+      setTimeout(() => this.errorMessage = '', 3000);
+      return;
+    }
+
     // Ouvrir la boîte de dialogue de sauvegarde
     const dialogRef = this.dialog.open(SaveFilterDialogComponent, {
       width: '400px',
@@ -1238,6 +1270,14 @@ export class ArchiveComponent implements OnInit, OnDestroy {
             // Afficher un message de confirmation
             this.successMessage = `Filtre "${result.name}" sauvegardé avec succès`;
             setTimeout(() => this.successMessage = '', 3000);
+
+            // Appliquer les filtres immédiatement
+            this.applyFilters(this.currentFilter || {});
+
+            // Si le panneau des filtres est ouvert, fermer le panneau pour montrer les résultats
+            if (this.isFilterExpanded) {
+              this.toggleFilterPanel();
+            }
           },
           error: (error) => {
             console.error('Erreur lors de la sauvegarde du filtre', error);

@@ -208,7 +208,11 @@
 
         <!-- Filtres avancés -->
         <div class="advanced-filter-panel" *ngIf="isFilterExpanded">
-            <app-advanced-filter (filtersChanged)="applyFilters($event)"></app-advanced-filter>
+            <app-advanced-filter 
+                (filtersChanged)="applyFilters($event)" 
+                (applyFilters)="applyFiltersDirectly($event)"
+                (saveFilter)="closeFilterPanel()">
+            </app-advanced-filter>
         </div>
 
         <!-- Chemin de navigation (breadcrumb) -->

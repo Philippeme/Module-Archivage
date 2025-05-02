@@ -1,4 +1,8 @@
 <div class="advanced-filter-container">
+    <div *ngIf="saveMessage" class="alert" [ngClass]="{'alert-success': saveSuccess, 'alert-danger': !saveSuccess}">
+        {{ saveMessage }}
+    </div>
+
     <div [formGroup]="filterForm" class="filter-form">
         <!-- Contrôle de l'opérateur logique -->
         <div class="form-group mb-3">
@@ -27,6 +31,9 @@
                     <option [ngValue]="null">Tous</option>
                     <option *ngFor="let type of documentTypes" [value]="type">{{ type }}</option>
                 </select>
+                <div class="invalid-feedback" *ngIf="filterForm.get('documentType')?.errors?.['requiredWithPerson']">
+                    Le type de document est requis lorsque vous spécifiez une personne concernée
+                </div>
             </div>
 
             <!-- Personne concernée -->
@@ -54,9 +61,14 @@
                 <label class="form-label">Période</label>
                 <div class="input-group">
                     <span class="input-group-text">Du</span>
-                    <input type="date" class="form-control" formControlName="startDate">
+                    <input type="date" class="form-control" formControlName="startDate"
+                        [ngClass]="{'is-invalid': filterForm.get('startDate')?.errors?.['required']}">
                     <span class="input-group-text">au</span>
-                    <input type="date" class="form-control" formControlName="endDate">
+                    <input type="date" class="form-control" formControlName="endDate"
+                        [ngClass]="{'is-invalid': filterForm.get('endDate')?.errors?.['required']}">
+                </div>
+                <div class="invalid-feedback" *ngIf="filterForm.get('endDate')?.errors?.['required']">
+                    La date de fin est requise lorsque vous spécifiez une date de début
                 </div>
             </div>
 
@@ -118,31 +130,43 @@
                 <div class="col-md-4 mb-3">
                     <label for="centreEtatCivil" class="form-label">Centre d'état civil</label>
                     <select class="form-select" id="centreEtatCivil" formControlName="centreEtatCivil"
+                        [ngClass]="{'is-invalid': filterForm.get('centreEtatCivil')?.errors?.['invalidHierarchy']}"
                         (ngModelChange)="onCentreEtatCivilChange($event)">
                         <option [ngValue]="null">Tous</option>
                         <option *ngFor="let centre of centresEtatCivil" [ngValue]="centre.id">{{ centre.nom }}</option>
                     </select>
+                    <div class="invalid-feedback" *ngIf="filterForm.get('centreEtatCivil')?.errors?.['invalidHierarchy']">
+                        Vous devez d'abord sélectionner une commune
+                    </div>
                 </div>
 
                 <!-- Centre de déclaration -->
                 <div class="col-md-4 mb-3">
                     <label for="centreDeclaration" class="form-label">Centre de déclaration</label>
                     <select class="form-select" id="centreDeclaration" formControlName="centreDeclaration"
+                        [ngClass]="{'is-invalid': filterForm.get('centreDeclaration')?.errors?.['invalidHierarchy']}"
                         (ngModelChange)="onCentreDeclarationChange($event)">
                         <option [ngValue]="null">Tous</option>
                         <option *ngFor="let centre of centresDeclaration" [ngValue]="centre.id">{{ centre.nom }}
                         </option>
                     </select>
+                    <div class="invalid-feedback" *ngIf="filterForm.get('centreDeclaration')?.errors?.['invalidHierarchy']">
+                        Vous devez d'abord sélectionner une commune
+                    </div>
                 </div>
 
                 <!-- Tribunal -->
                 <div class="col-md-4 mb-3">
                     <label for="tribunal" class="form-label">Tribunal</label>
                     <select class="form-select" id="tribunal" formControlName="tribunal"
+                        [ngClass]="{'is-invalid': filterForm.get('tribunal')?.errors?.['invalidHierarchy']}"
                         (ngModelChange)="onTribunalChange($event)">
                         <option [ngValue]="null">Tous</option>
                         <option *ngFor="let tribunal of tribunaux" [ngValue]="tribunal.id">{{ tribunal.nom }}</option>
                     </select>
+                    <div class="invalid-feedback" *ngIf="filterForm.get('tribunal')?.errors?.['invalidHierarchy']">
+                        Vous devez d'abord sélectionner une commune
+                    </div>
                 </div>
             </div>
         </div>
@@ -153,6 +177,19 @@
                 <input class="form-check-input" type="checkbox" id="excludeDeleted" formControlName="excludeDeleted">
                 <label class="form-check-label" for="excludeDeleted">Exclure les documents supprimés</label>
             </div>
+        </div>
+
+        <!-- Boutons d'action -->
+        <div class="action-buttons">
+            <button type="button" class="btn btn-primary" (click)="doApplyFilters()">
+                <i class="bi bi-funnel-fill me-1"></i> Appliquer
+            </button>
+            <button type="button" class="btn btn-success ms-2" (click)="doSaveFilter()">
+                <i class="bi bi-save me-1"></i> Sauvegarder
+            </button>
+            <button type="button" class="btn btn-outline-secondary ms-2" (click)="resetFilters()">
+                <i class="bi bi-x-circle me-1"></i> Réinitialiser
+            </button>
         </div>
     </div>
 </div>

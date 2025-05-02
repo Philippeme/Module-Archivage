@@ -1,13 +1,11 @@
 .advanced-filter-container {
-  margin-bottom: 0;
+  position: relative;
   background-color: #fff;
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 15px;
   overflow-y: auto;
-  max-height: 100%;
-  height: calc(100% - 30px);
-  /* Prendre toute la hauteur disponible moins les marges */
+  height: calc(100vh - 160px); /* Ajusté pour occupe tout l'espace vertical disponible */
   display: flex;
   flex-direction: column;
 }
@@ -31,7 +29,15 @@
   margin-top: 15px;
   padding-top: 10px;
   border-top: 1px solid #dee2e6;
-  margin-bottom: 0;
+  margin-bottom: 15px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #dee2e6;
 }
 
 .dropdown-item {
@@ -99,4 +105,18 @@
 .col-md-6 {
   padding-left: 7.5px;
   padding-right: 7.5px;
+}
+
+.alert {
+  margin-bottom: 15px;
+}
+
+/* Ajustements de la hauteur et du scroll */
+.form-control, .form-select {
+  min-height: 38px;
+}
+
+.is-invalid {
+  padding-right: calc(1.5em + 0.75rem) !important;
+  background-position: right calc(0.375em + 0.1875rem) center !important;
 }

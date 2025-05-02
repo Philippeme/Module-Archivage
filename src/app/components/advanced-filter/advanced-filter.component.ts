@@ -16,6 +16,7 @@ import { DatabaseService } from '../../services/database.service';
 export class AdvancedFilterComponent implements OnInit, OnDestroy {
   @Output() filtersChanged = new EventEmitter<FilterCriteria>();
   @Output() saveFilter = new EventEmitter<void>();
+  @Output() applyFilters = new EventEmitter<FilterCriteria>();
 
   filterForm: FormGroup;
   documentTypes = Object.values(DocumentType);
@@ -25,6 +26,8 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
   ];
   savedFilters: SavedFilter[] = [];
   isLoading = false;
+  saveSuccess = false;
+  saveMessage = '';
 
   // Données pour les filtres géographiques
   regions: any[] = [];
@@ -90,7 +93,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       takeUntil(this.destroy$)
     ).subscribe(values => {
-      this.applyFilters();
+      this.applyFilters.emit(this.prepareFilters());
     });
 
     // Charger les filtres sauvegardés
@@ -105,7 +108,28 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // Nouvelle méthode pour mettre à jour les validations du formulaire en fonction de l'opérateur logique
+  // Nouvelle méthode pour préparer les filtres
+  prepareFilters(): FilterCriteria {
+    const formValues = this.filterForm.value;
+    const logicalOperator = formValues.logicalOperator;
+
+    // Ne prendre que les valeurs non vides
+    const criteria: FilterCriteria = Object.entries(formValues).reduce((acc, [key, value]) => {
+      if (value !== null && value !== '' && (Array.isArray(value) ? value.length > 0 : true)) {
+        if (key in acc || Object.keys(new Object() as FilterCriteria).includes(key)) {
+          acc[key as keyof FilterCriteria] = value as any;
+        }
+      }
+      return acc;
+    }, {} as FilterCriteria);
+
+    // S'assurer que l'opérateur logique est toujours inclus, même s'il s'agit de la valeur par défaut
+    criteria.logicalOperator = logicalOperator;
+
+    return criteria;
+  }
+
+  // Méthode pour mettre à jour les validations du formulaire en fonction de l'opérateur logique
   updateFormValidations(operatorValue: 'AND' | 'OR'): void {
     // Obtenir tous les contrôles sauf l'opérateur logique
     const controls = Object.keys(this.filterForm.controls).filter(key => key !== 'logicalOperator');
@@ -193,26 +217,65 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     });
   }
 
-  applyFilters(): void {
-    const formValues = this.filterForm.value;
-    const logicalOperator = formValues.logicalOperator;
-
-    // Ne prendre que les valeurs non vides
-    const criteria: FilterCriteria = Object.entries(formValues).reduce((acc, [key, value]) => {
-      if (value !== null && value !== '' && (Array.isArray(value) ? value.length > 0 : true)) {
-        if (key in acc || Object.keys(new Object() as FilterCriteria).includes(key)) {
-          acc[key as keyof FilterCriteria] = value as any;
-        }
-      }
-      return acc;
-    }, {} as FilterCriteria);
-
-    // S'assurer que l'opérateur logique est toujours inclus, même s'il s'agit de la valeur par défaut
-    criteria.logicalOperator = logicalOperator;
+  doApplyFilters(): void {
+    const criteria = this.prepareFilters();
 
     // Mettre à jour le service de filtres et émettre le changement
     this.filterService.updateFilter(criteria);
     this.filtersChanged.emit(criteria);
+
+    // Émettre un événement pour appliquer directement les filtres
+    this.applyFilters.emit(criteria);
+  }
+
+  doSaveFilter(): void {
+    const criteria = this.prepareFilters();
+
+    // Ouvrir la boîte de dialogue de sauvegarde
+    const dialogRef = this.dialog.open(SaveFilterDialogComponent, {
+      width: '400px',
+      data: {
+        filter: {
+          criteria: criteria
+        },
+        existingFilters: this.savedFilters
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.isLoading = true;
+        this.filterService.saveFilter(
+          { criteria: criteria },
+          result.name,
+          result.description,
+          result.isDefault || false
+        ).subscribe({
+          next: (savedFilter) => {
+            this.savedFilters = [...this.savedFilters.filter(f => f.id !== savedFilter.id), savedFilter];
+            this.isLoading = false;
+
+            // Mettre à jour le filtre courant
+            this.filterService.updateFilter(criteria);
+
+            // Appliquer directement les filtres
+            this.filtersChanged.emit(criteria);
+            this.applyFilters.emit(criteria);
+
+            // Afficher un message de succès
+            this.showSuccessMessage(`Filtre "${result.name}" sauvegardé avec succès`);
+
+            // Émettre un événement pour indiquer que le filtre a été sauvegardé
+            this.saveFilter.emit();
+          },
+          error: (error) => {
+            console.error('Erreur lors de la sauvegarde du filtre', error);
+            this.isLoading = false;
+            this.showErrorMessage(`Erreur lors de la sauvegarde du filtre: ${error.message}`);
+          }
+        });
+      }
+    });
   }
 
   resetFilters(): void {
@@ -252,7 +315,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
     this.tribunaux = [];
 
     // Appliquer les filtres réinitialisés
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
 
@@ -271,7 +334,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
   }
 
   onSaveFilter(): void {
-    this.saveFilter.emit();
+    this.doSaveFilter();
   }
 
   loadFilter(filterId: string): void {
@@ -285,7 +348,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
           this.updateFormValidations(filter.criteria.logicalOperator as 'AND' | 'OR');
         }
 
-        this.applyFilters();
+        this.doApplyFilters();
         this.isLoading = false;
 
         // Mettre à jour les sélections géographiques
@@ -349,7 +412,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
   onCercleChange(cercleId: number): void {
@@ -383,7 +446,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
   onCommuneChange(communeId: number): void {
@@ -432,7 +495,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
   onCentreEtatCivilChange(centreId: number): void {
@@ -442,7 +505,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ centreEtatCivil: centre.nom });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
   onCentreDeclarationChange(centreId: number): void {
@@ -452,7 +515,7 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ centreDeclaration: centre.nom });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
   }
 
   onTribunalChange(tribunalId: number): void {
@@ -462,6 +525,23 @@ export class AdvancedFilterComponent implements OnInit, OnDestroy {
       this.filterForm.patchValue({ tribunal: tribunal.nom });
     }
 
-    this.applyFilters();
+    this.doApplyFilters();
+  }
+
+  private showSuccessMessage(message: string): void {
+    this.saveSuccess = true;
+    this.saveMessage = message;
+    setTimeout(() => {
+      this.saveSuccess = false;
+      this.saveMessage = '';
+    }, 3000);
+  }
+
+  private showErrorMessage(message: string): void {
+    this.saveSuccess = false;
+    this.saveMessage = message;
+    setTimeout(() => {
+      this.saveMessage = '';
+    }, 3000);
   }
 }
